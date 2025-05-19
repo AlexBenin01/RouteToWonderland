@@ -1,0 +1,28 @@
+{
+  "attività": {
+    "type": "array",
+    "description": "elenco delle attività",
+    "items": {
+      "type": "string",
+      "enum":["rafting", "arrampicata", "trekking"]
+    },
+    "uniqueItems": true
+  },
+  "livello_difficoltà": {
+    "type": "string",
+    "description": "livello di difficoltà richiesto",
+    "enum":["principiante", "intermedio", "avanzato"]
+  },
+  "attrezzatura_necessaria": {
+    "type": "boolean",
+    "description": "true/false se si richiede attrezzatura"
+  },
+  "guida_esperta": {
+    "type": "boolean",
+    "description": "true/false se si richiede una guida esperta"
+  },
+  "lingua_guida": {
+    "type": "string",
+    "description": "lingua preferita per la guida esperta"
+  }
+} 

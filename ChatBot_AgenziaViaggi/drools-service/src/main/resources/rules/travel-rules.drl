@@ -1,0 +1,116 @@
+package com.traveltorules.rules;
+
+import com.traveltorules.model.TravelPreference;
+import java.util.ArrayList;
+import java.util.List;
+
+global List<String> activeTemplates;
+
+// Regole per il tipo di partecipanti
+rule "Regola Famiglia"
+    when
+        $pref : TravelPreference(tipoPartecipanti == "famiglia")
+    then
+        activeTemplates.add("famiglia");
+        activeTemplates.add("alloggi");
+        activeTemplates.add("noleggi");
+end
+
+rule "Regola Anziani"
+    when
+        $pref : TravelPreference(tipoPartecipanti == "anziani")
+    then
+        activeTemplates.add("benessere");
+        activeTemplates.add("citta_arte");
+        activeTemplates.add("alloggi");
+end
+
+// Regole per il mood della vacanza
+rule "Mare Template"
+    when
+        $pref : TravelPreference(moodVacanza contains "mare")
+    then
+        activeTemplates.add("mare");
+        activeTemplates.add("alloggi");
+end
+
+rule "Montagna Template"
+    when
+        $pref : TravelPreference(moodVacanza contains "montagna")
+    then
+        activeTemplates.add("montagna");
+        activeTemplates.add("alloggi");
+end
+
+rule "Città d'Arte Template"
+    when
+        $pref : TravelPreference(moodVacanza contains "cultura" || moodVacanza contains "arte")
+    then
+        activeTemplates.add("citta_arte");
+        activeTemplates.add("alloggi");
+end
+
+rule "Gastronomia Template"
+    when
+        $pref : TravelPreference(moodVacanza contains "gastronomia")
+    then
+        activeTemplates.add("gastronomia");
+        activeTemplates.add("alloggi");
+end
+
+rule "Benessere Template"
+    when
+        $pref : TravelPreference(moodVacanza contains "benessere")
+    then
+        activeTemplates.add("benessere");
+        activeTemplates.add("alloggi");
+end
+
+rule "Avventura Template"
+    when
+        $pref : TravelPreference(moodVacanza contains "avventura")
+    then
+        activeTemplates.add("avventura");
+        activeTemplates.add("alloggi");
+        activeTemplates.add("noleggi");
+end
+
+rule "Naturalistico Template"
+    when
+        $pref : TravelPreference(moodVacanza contains "natura")
+    then
+        activeTemplates.add("naturalistico");
+        activeTemplates.add("alloggi");
+end
+
+// Regole per la durata del viaggio
+rule "Viaggio Lungo"
+    when
+        $pref : TravelPreference(tripDuration > 2)
+    then
+        activeTemplates.add("alloggi");
+        activeTemplates.add("noleggi");
+end
+
+// Regole per il budget
+rule "Budget Alto"
+    when
+        $pref : TravelPreference(budgetViaggio > 2000)
+    then
+        activeTemplates.add("benessere");
+end
+
+// Regole per il periodo
+rule "Periodo Estivo"
+    when
+        $pref : TravelPreference(departureDate matches ".*-0[6-8]-.*")
+    then
+        activeTemplates.add("mare");
+end
+
+rule "Periodo Invernale"
+    when
+        $pref : TravelPreference(departureDate matches ".*-(0[1-2]|12)-.*")
+    then
+        activeTemplates.add("montagna");
+end 

@@ -1,0 +1,4 @@
+com\traveltorules\controller\PreferenceController.class
+com\traveltorules\service\RuleService.class
+com\traveltorules\model\TravelPreference.class
+com\traveltorules\DroolsApplication.class

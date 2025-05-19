@@ -1,0 +1,14 @@
+{
+  "richiesta_ombrellone": {
+    "type": "boolean",
+    "description": "true/false se si desidera ombrellone e lettini"
+  },
+  "attività_acquatiche": {
+    "type": "array",
+    "items": {
+      "type": "string"
+    },
+    "description": "elenco delle attività richieste",
+    "enum":["snorkeling", "windsurf", "subacquea"]
+  }
+} 

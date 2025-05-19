@@ -1,0 +1,11 @@
+{
+  "trattamenti": {
+    "type": "array",
+    "description": "elenco dei trattamenti desiderati",
+    "items": {  
+      "type": "string",
+      "enum":["massaggi", "fango", "idromassaggio"]
+    },
+    "uniqueItems": true
+  }
+} 

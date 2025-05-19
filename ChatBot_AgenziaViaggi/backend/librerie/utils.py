@@ -2,6 +2,7 @@ import torch
 import torchvision.transforms as T
 from PIL import Image
 from torchvision.transforms.functional import InterpolationMode
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -263,3 +264,40 @@ def nuextract_generate(model, tokenizer, prompts, generation_config, pixel_value
     responses = tokenizer.batch_decode(outputs, skip_special_tokens=True)
     
     return responses
+
+# =====================
+# UTILITY GENERALI
+# =====================
+def extract_entities(text, template, model_path='./NuExtract-2-2B-experimental', current_data=None):
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
+    msg = construct_message(text, template, current_data)
+    input_messages = [msg]
+    input_content = prepare_inputs(
+        messages=input_messages,
+        image_paths=[],
+        tokenizer=tokenizer,
+    )
+    generation_config = {"do_sample": False, "num_beams": 1, "max_new_tokens": 2048}
+    with torch.no_grad():
+        result = nuextract_generate(
+            model=model,
+            tokenizer=tokenizer,
+            prompts=input_content['prompts'],
+            pixel_values_list=input_content['pixel_values_list'],
+            num_patches_list=input_content['num_patches_list'],
+            generation_config=generation_config
+        )
+    return result[0]
+
+def extract_and_print(text, template, model_path='./NuExtract-2-2B-experimental'):
+    """
+    Estrae e stampa le entità dal testo.
+    
+    Args:
+        text: Il testo da analizzare
+        template: Il template JSON che definisce lo schema di output
+        model_path: Il percorso al modello NuExtract
+    """
+    result = extract_entities(text, template, model_path)
+    return result

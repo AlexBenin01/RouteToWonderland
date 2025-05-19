@@ -48,6 +48,8 @@ RouteToWonderland è una piattaforma intelligente per la creazione di viaggi per
 
 - Python 3.10
 - Node.js 16+
+- JDK 17 (per Droll_Service)
+- Maven (per Droll_Service)
 
 ### (Opzionale) Ambiente virtuale Python
 
@@ -77,15 +79,21 @@ npm install react-router-dom
 Posizionati nella cartella backend:
 
 ```bash
+pip install dotenv
 pip install einops
 pip install timm
+pip install sentence_transformers
 pip install tiktoken
-pip install langdetect deep-translator
 pip install torchvision
 pip install sentencepiece
-pip install spacy
 pip install "torch>=2.1" "nncf>=2.7" "transformers>=4.40.0" "onnx<1.16.2" "optimum>=1.16.1" "accelerate" "datasets>=2.14.6" "git+https://github.com/huggingface/optimum-intel.git" --extra-index-url https://download.pytorch.org/whl/cpu
 pip install fastapi uvicorn
+```
+
+### Installazione dipendenze per embedding
+
+```bash
+pip install nomic psycopg2-binary pgvector
 ```
 
 ### Note modello AI
@@ -110,13 +118,21 @@ cd frontend
 npm run dev
 ```
 
+### Droll_Service
+
+Assicurati di avere JDK 17 installato e Maven configurato con le variabili d'ambiente corrette. Poi esegui:
+
+```bash
+mvn spring-boot:run
+```
+
 Ora puoi accedere all'applicazione su [http://localhost:5173](http://localhost:5173) e inviare testo al modello per vedere i dati estratti.
 
 ---
 
 ## Note importanti
 
-- La cartella `NuExtract-2-2B-experimental` è esclusa dal repository (`.gitignore`) perché contiene file di grandi dimensioni e modelli proprietari.
+- Le cartelle `NuExtract-2-xB-experimental` e `nomic-embed-text-v1.5` sono escluse dal repository (`.gitignore`) perché contiene file di grandi dimensioni e modelli proprietari.
 - Per il corretto funzionamento, assicurati di avere i file del modello nella posizione corretta.
 
 ---

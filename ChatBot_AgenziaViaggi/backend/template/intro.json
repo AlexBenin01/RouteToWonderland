@@ -1,0 +1,10 @@
+{
+  "nazione_destinazione": "verbatim-string",
+  "regione_citta_destinazione": "verbatim-string",
+  "departure_date": "data prevista per la partenza, nel formato YYYY-MM-DD",
+  "numero_partecipanti": "integer",
+  "tipo_partecipanti": ["adulti", "anziani", "famiglia"],
+  "mood_vacanza": [["avventura", "cultura", "benessere", "mare", "montagna", "citta_arte", "famiglia", "naturalistico", "gastronomia"]],
+  "budget_viaggio": "integer",
+  "trip_duration": "total duration of the trip, expressed in days"
+}

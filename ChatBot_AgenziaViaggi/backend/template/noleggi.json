@@ -1,0 +1,16 @@
+{
+  "posti_auto": {
+    "type": "integer",
+    "description": "Numero minimo di posti richiesti per il veicolo. Ad esempio, 4 posti, 5 posti, ecc."
+  },
+  "tipo_auto": {
+    "type": "multi-label",
+    "description": "Preferenze sul tipo di veicolo. Può includere più opzioni, come tipo di motore (elettrica, ibrida), tipo di carrozzeria (SUV, berlina), cambio (automatico, manuale), e marca (es. Ferrari, Tesla).",
+    "enum": [["elettrica", "ibrida", "benzina", "diesel"], ["SUV", "berlina", "cabrio"], ["automatico", "manuale"], ["Ferrari", "Tesla", "Audi", "BMW"]]
+  },
+  "budget_auto": {
+    "type": "string",
+    "description": "Budget massimo disponibile per il noleggio del veicolo",
+    "enum":["economico", "medio", "lussuoso"]
+  }
+}
