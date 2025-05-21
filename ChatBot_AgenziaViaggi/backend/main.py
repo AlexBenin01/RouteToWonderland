@@ -10,6 +10,17 @@ from typing import Dict, Any, Optional, List
 from librerie.ollama_lib import OllamaManager
 from librerie.NuEstractLib import NuExtract
 from librerie.intro_lib import IntroTemplate
+from librerie.contatti_lib import ContattiTemplate
+from librerie.trasporto_lib import TrasportoTemplate
+from librerie.alloggi_lib import AlloggiTemplate
+from librerie.noleggi_lib import NoleggiTemplate
+from librerie.naturalistico_lib import NaturalisticoTemplate
+from librerie.avventura_lib import AvventuraTemplate
+from librerie.montagna_lib import MontagnaTemplate
+from librerie.mare_lib import MareTemplate
+from librerie.gastronomia_lib import GastronomiaTemplate
+from librerie.citta_arte_lib import CittaArteTemplate
+from librerie.benessere_lib import BenessereTemplate
 from services.drools_service import DroolsService
 import logging
 from librerie.template_manager import TemplateManager
@@ -48,7 +59,23 @@ template_manager.update_template_sequence(["intro", "contatti","trasporto"])
 
 ollama_manager = OllamaManager()
 nu_extract = NuExtract()
-intro_template = IntroTemplate(template_manager)
+
+# Inizializzazione di tutti i template
+templates = {
+    "intro": IntroTemplate(template_manager),
+    "contatti": ContattiTemplate(template_manager),
+    "trasporto": TrasportoTemplate(template_manager),
+    "alloggi": AlloggiTemplate(template_manager),
+    "noleggi": NoleggiTemplate(template_manager),
+    "naturalistico": NaturalisticoTemplate(template_manager),
+    "avventura": AvventuraTemplate(template_manager),
+    "montagna": MontagnaTemplate(template_manager),
+    "mare": MareTemplate(template_manager),
+    "gastronomia": GastronomiaTemplate(template_manager),
+    "citta_arte": CittaArteTemplate(template_manager),
+    "benessere": BenessereTemplate(template_manager)
+}
+
 drools_service = DroolsService()
 
 class SimpleRequest(BaseModel):
@@ -128,16 +155,20 @@ async def extract_simple(request: SimpleRequest):
         logger.info(f"Template modificato: {template_modificato}")
         logger.info(f"Template aggiornato: {template_aggiornato}")
         
-        # Se il template è "intro", verifica tutti i campi
-        errors = []
-        warnings = []
-        if template_manager.active_template == "intro":
-            logger.info("Verifica template intro")
-            template_aggiornato, warnings, errors = intro_template.verifica_template(template_aggiornato)
+        # Ottieni l'istanza del template corrente
+        current_template = templates.get(template_manager.active_template)
+        if current_template:
+            logger.info(f"Tipo di current_template: {type(current_template)}")
+            logger.info(f"Classi base di current_template: {type(current_template).__bases__}")
+            # Verifica il template usando il metodo della classe base
+            template_aggiornato, warnings, errors = current_template.verifica_template(template_aggiornato)
             if errors:
-                logger.warning(f"Errori nel template intro: {errors}")
+                logger.warning(f"Errori nel template {template_manager.active_template}: {errors}")
             if warnings:
-                logger.warning(f"Warning nel template intro: {warnings}")
+                logger.warning(f"Warning nel template {template_manager.active_template}: {warnings}")
+        else:
+            warnings = []
+            errors = []
         
         # Aggiorna lo stato solo se ci sono state modifiche
         if template_modificato:
@@ -147,16 +178,20 @@ async def extract_simple(request: SimpleRequest):
             logger.info(f"Stato aggiornato per il template {template_manager.active_template}")
             logger.info(f"Stato completo: {STATO_CONVERSAZIONE_JSON}")
         
-        # Verifica se il template è completo
+        # Verifica se il template è completo usando il metodo della classe base
         template_completo = all(
-            campo in template_aggiornato and template_aggiornato[campo]
+            campo in template_aggiornato and (
+                template_aggiornato[campo] is not None and 
+                (isinstance(template_aggiornato[campo], bool) or template_aggiornato[campo])
+            )
             for campo in template_manager.get_active_template().keys()
         )
         logger.info(f"Template completo: {template_completo}")
         
         if template_completo:
             logger.info(f"Template {template_manager.active_template} completato")
-            # Se il template "intro" è completo, chiama evaluate_preferences
+            
+            # Gestione speciale per il template intro
             if template_manager.active_template == "intro":
                 logger.info("Template intro completato, preparazione chiamata evaluate_preferences")
                 # Prepara la richiesta per evaluate_preferences
@@ -223,8 +258,8 @@ async def extract_simple(request: SimpleRequest):
             "guide_phrase": risposta,
             "template_usato": template_manager.active_template,
             "stato_conversazione": stato_attuale,
-            "warnings": warnings if template_manager.active_template == "intro" else [],
-            "errors": errors if template_manager.active_template == "intro" else []
+            "warnings": warnings,
+            "errors": errors
         }
         
         logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE ===")

@@ -12,11 +12,14 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
+from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
-class AlloggiTemplate:
-    def __init__(self, template_name="alloggi"):
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
+class AlloggiTemplate(BaseTemplate):
+    def __init__(self, template_manager: TemplateManager):
+        super().__init__(template_manager)
+        self.template_name = "alloggi"
+        self.template_path = f"template/{self.template_name}.json"
         self.template_data = self._load_template()
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
@@ -36,25 +39,25 @@ class AlloggiTemplate:
         self.template_name = template_name
         self.template_path = f"template/{template_name}.json"
         self.template_data = self._load_template()
-    
-    def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
+
+        
+    def validate_alloggio(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Valida i dati in input secondo il template
+        Verifica il tipo di alloggio usando gli embedding.
+        Controlla che il tipo di alloggio inserito corrisponda a un tipo valido nel database.
         
         Args:
-            data: Dizionario contenente i dati da validare
+            data: Dizionario contenente i dati da verificare
             
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        corrected_data = {}
-        
         try:
-            # Validazione tipo_alloggio
             if 'tipo_alloggio' not in data or not data['tipo_alloggio']:
-                return False, "Il tipo di alloggio è obbligatorio", corrected_data
+                print("Tipo alloggio mancante o vuoto")
+                return False, "Il tipo di alloggio è obbligatorio", data
 
-            print(f"Verifica alloggio per: {data['tipo_alloggio']}")
+            print(f"Verifica tipo alloggio: {data['tipo_alloggio']}")
             
             print("Tentativo di connessione al database...")
             conn = psycopg2.connect(
@@ -68,13 +71,11 @@ class AlloggiTemplate:
             cursor = conn.cursor()
 
             try:
-                print("Generazione embedding con modello locale...")
+                print("Generazione embedding per il tipo di alloggio...")
                 print(f"Testo da convertire in embedding: '{data['tipo_alloggio']}'")
-                # Genera l'embedding per il tipo di alloggio
-                alloggio_embedding = self.model.encode(data['tipo_alloggio'])
-                print(f"Embedding generato con successo, dimensione: {len(alloggio_embedding)}")
-                # Converti l'array NumPy in lista
-                alloggio_embedding = alloggio_embedding.tolist()
+                tipo_alloggio_embedding = self.model.encode(data['tipo_alloggio'])
+                print(f"Embedding generato con successo, dimensione: {len(tipo_alloggio_embedding)}")
+                tipo_alloggio_embedding = tipo_alloggio_embedding.tolist()
             except Exception as e:
                 print(f"Errore durante la generazione dell'embedding: {str(e)}")
                 print(f"Tipo di errore: {type(e)}")
@@ -83,38 +84,40 @@ class AlloggiTemplate:
                 print(traceback.format_exc())
                 raise
 
-            print("Esecuzione query per trovare l'alloggio più simile...")
+            print("Esecuzione query per trovare il tipo di alloggio più simile...")
             cursor.execute("""
-                SELECT nome, embedding_alloggi <=> %s::vector as distanza
-                FROM alloggi
-                WHERE embedding_alloggi IS NOT NULL
+                SELECT alloggi, embedding_tipo_alloggio <=> %s::vector as distanza
+                FROM tipo_alloggio
+                WHERE embedding_tipo_alloggio IS NOT NULL
                 ORDER BY distanza ASC
                 LIMIT 1
-            """, (alloggio_embedding,))
+            """, (tipo_alloggio_embedding,))
             
             risultato = cursor.fetchall()
             print(f"Risultato query: {risultato}")
             
             if risultato:
-                alloggio_corretto, distanza = risultato[0]
+                tipo_alloggio_corretto, distanza = risultato[0]
                 print(f"Distanza trovata: {distanza}")
                 if distanza > 0.4:
                     print(f"Distanza troppo grande ({distanza} > 0.4), rimuovo il valore")
-                    return False, "Nessun alloggio simile trovato nel database", corrected_data
+                    data['tipo_alloggio'] = None
+                    return False, "Nessun tipo di alloggio simile trovato nel database", data
                 
-                print(f"Aggiornamento alloggio da '{data['tipo_alloggio']}' a '{alloggio_corretto}'")
-                corrected_data['tipo_alloggio'] = alloggio_corretto
-                return True, "Alloggio verificato e corretto", corrected_data
+                print(f"Aggiornamento tipo alloggio da '{data['tipo_alloggio']}' a '{tipo_alloggio_corretto}'")
+                data['tipo_alloggio'] = tipo_alloggio_corretto
+                return True, "Tipo di alloggio verificato e corretto", data
             else:
-                print("Nessun risultato trovato nel database")
-                return False, "Nessun alloggio trovato nel database", corrected_data
+                print("Nessun risultato trovato nel database, rimuovo il valore")
+                data['tipo_alloggio'] = None
+                return False, "Nessun tipo di alloggio trovato nel database", data
 
         except Exception as e:
-            print(f"Errore durante la verifica dell'alloggio: {str(e)}")
+            print(f"Errore durante la verifica del tipo di alloggio: {str(e)}")
             import traceback
             print("Stack trace:")
             print(traceback.format_exc())
-            return False, f"Errore durante la verifica dell'alloggio: {str(e)}", corrected_data
+            return False, f"Errore durante la verifica del tipo di alloggio: {str(e)}", data
         finally:
             if 'cursor' in locals():
                 print("Chiusura cursor")
@@ -122,29 +125,43 @@ class AlloggiTemplate:
             if 'conn' in locals():
                 print("Chiusura connessione")
                 conn.close()
+
     
-    def process_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Elabora i dati secondo le regole del template
+        Valida i dati in input secondo il template
         
         Args:
-            data: Dizionario contenente i dati da elaborare
+            data: Dizionario contenente i dati da validare
             
         Returns:
-            Dict[str, Any]: Dati elaborati
+            Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        processed_data = {}
+        print("[DEBUG] Inizio validazione dati alloggi")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        corrected_data = data.copy()
+        template_data = self.get_template_data()
         
-        # Normalizza il tipo di alloggio
-        if 'tipo_alloggio' in data:
-            if isinstance(data['tipo_alloggio'], str):
-                processed_data['tipo_alloggio'] = data['tipo_alloggio'].strip().lower()
-            elif isinstance(data['tipo_alloggio'], list):
-                processed_data['tipo_alloggio'] = [item.strip().lower() for item in data['tipo_alloggio']]
-            else:
-                processed_data['tipo_alloggio'] = data['tipo_alloggio']
+        try:
+            # Validazione tipo_alloggio usando validate_alloggio
+            if 'tipo_alloggio' in data:
+                print(f"[DEBUG] Validazione tipo_alloggio: {data['tipo_alloggio']}")
+                is_valid, error_msg, corrected_data = self.validate_alloggio(corrected_data)
+                if not is_valid:
+                    print(f"[ERROR] Validazione tipo_alloggio fallita: {error_msg}")
+                    return False, error_msg, corrected_data
+                print(f"[DEBUG] tipo_alloggio validato con successo: {corrected_data['tipo_alloggio']}")
+
+           
+            
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
+            return True, "Dati validi", corrected_data
+            
+        except Exception as e:
+            print(f"[ERROR] Errore durante la validazione: {str(e)}")
+            return False, f"Errore durante la validazione: {str(e)}", corrected_data
         
-        return processed_data
 
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """
@@ -156,20 +173,27 @@ class AlloggiTemplate:
         Returns:
             Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
         """
+        print("[DEBUG] Inizio verifica_template alloggi")
+        print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
         updated_data = data.copy()
         
         try:
-            # Verifica e normalizza i dati
-            updated_data = self.process_data(updated_data)
+            # Chiama il metodo della classe base per la validazione standard
+            print("[DEBUG] Chiamata verifica_template della classe base")
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
+            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
+            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
             
-            # Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
+            print("[DEBUG] Verifica template completata")
+            print(f"[DEBUG] Dati aggiornati: {updated_data}")
+            return updated_data, warnings, errors
             
-            return updated_data, warnings, errors 
         except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            error_msg = f"Errore durante la verifica del template: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            errors.append(error_msg)
             return updated_data, warnings, errors 

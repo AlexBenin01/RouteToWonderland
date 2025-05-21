@@ -13,6 +13,8 @@ import numpy as np
 import os
 from pathlib import Path
 import logging
+from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
 # Configurazione del logging
 logging.basicConfig(
@@ -25,29 +27,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class CittaArteTemplate:
-    def __init__(self, template_name="citta_arte"):
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
-        self.template_data = self._load_template()
+class CittaArteTemplate(BaseTemplate):
+    def __init__(self, template_manager: TemplateManager):
+        super().__init__(template_manager)
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
-    
-    def _load_template(self) -> Dict[str, Any]:
-        """Carica il template JSON"""
-        try:
-            with open(self.template_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            print(f"Template {self.template_name} non trovato, uso il template di default")
-            with open("template/citta_arte.json", 'r', encoding='utf-8') as f:
-                return json.load(f)
-    
-    def set_template(self, template_name: str):
-        """Cambia il template attivo"""
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
-        self.template_data = self._load_template()
     
     def validate_attivita(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
@@ -91,7 +75,7 @@ class CittaArteTemplate:
 
                     print("Esecuzione query per trovare l'attività più simile...")
                     cursor.execute("""
-                        SELECT attivita embedding_attivita <=> %s::vector as distanza
+                        SELECT attivita, embedding_attivita <=> %s::vector as distanza
                         FROM attivita_citta
                         WHERE embedding_attivita IS NOT NULL
                         ORDER BY distanza ASC
@@ -145,62 +129,53 @@ class CittaArteTemplate:
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        corrected_data = {}
+        print("[DEBUG] Inizio validazione dati città e arte")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        corrected_data = data.copy()
+        #template_data = self.get_template_data()
+        
         try:
-            logger.info(f"Dati ricevuti in validate_data: {data}")
-            
-            # Validazione attività
+            # Validazione attività usando validate_attivita
             if 'attivita' in data:
-                is_valid, msg, attivita_data = self.validate_attivita(data)
+                print(f"[DEBUG] Validazione attività: {data['attivita']}")
+                is_valid, msg, updated_data = self.validate_attivita(data)
                 if not is_valid:
+                    print(f"[ERROR] {msg}")
+                    corrected_data['attivita'] = []
                     return False, msg, corrected_data
-                corrected_data.update(attivita_data)
+                corrected_data.update(updated_data)
+                print(f"[DEBUG] Attività valide: {corrected_data['attivita']}")
 
-            # Validazione guida_esperta
+            # Gestione guida turistica e lingua
             if 'richiesta_guida_turistica' in data:
-                logger.info(f"Tipo di richiesta_guida_turistica: {type(data['richiesta_guida_turistica'])}")
-                logger.info(f"Valore di richiesta_guida_turistica: {data['richiesta_guida_turistica']}")
-                
-                # Converti il valore in booleano se è una stringa
-                if isinstance(data['richiesta_guida_turistica'], str):
-                    logger.info("Conversione da stringa a booleano")
-                    data['richiesta_guida_turistica'] = data['richiesta_guida_turistica'].lower() == 'true'
-                    logger.info(f"Valore convertito: {data['richiesta_guida_turistica']}")
-                elif not isinstance(data['richiesta_guida_turistica'], bool):
-                    logger.error(f"Tipo non valido per richiesta_guida_turistica: {type(data['richiesta_guida_turistica'])}")
-                    return False, "Il campo richiesta_guida_turistica deve essere un booleano o una stringa 'true'/'false'", corrected_data
-                
-                corrected_data['richiesta_guida_turistica'] = data['richiesta_guida_turistica']
-                logger.info(f"Valore corretto salvato: {corrected_data['richiesta_guida_turistica']}")
-                
-                # Se richiesta_guida_turistica è False, imposta lingua_guida a "no guida"
-                if not data['richiesta_guida_turistica']:
-                    logger.info("Richiesta guida turistica è False, impostazione lingua_guida a 'no guida'")
+                print(f"[DEBUG] Verifica richiesta_guida_turistica: {data['richiesta_guida_turistica']}")
+                if data['richiesta_guida_turistica'].lower() == "no":
+                    print("[DEBUG] Richiesta guida turistica impostata a no")
                     corrected_data['lingua_guida'] = "no guida"
-                    logger.info(f"Dati corretti finali: {corrected_data}")
-                    return True, "Dati validi", corrected_data
+                    print(f"[DEBUG] Lingua guida impostata a: {corrected_data['lingua_guida']}")
+                elif data['richiesta_guida_turistica'].lower() == "si":
+                    if 'lingua_guida' not in data or not data['lingua_guida']:
+                        print("[ERROR] Lingua guida mancante o non specificata")
+                        return False, "La lingua della guida è obbligatoria quando è richiesta una guida turistica", corrected_data
+                else:
+                    print("[ERROR] Valore non valido per richiesta_guida_turistica")
+                    return False, "Il campo richiesta_guida_turistica deve essere 'si' o 'no'", corrected_data
+            else:
+                print("[ERROR] Campo richiesta_guida_turistica mancante")
+                return False, "Il campo richiesta_guida_turistica è obbligatorio", corrected_data
 
-            # Validazione lingua_guida (solo se guida_esperta è True)
-            if 'lingua_guida' in data and data.get('richiesta_guida_turistica', False):
-                logger.info(f"Validazione lingua_guida: {data['lingua_guida']}")
-                if not isinstance(data['lingua_guida'], str):
-                    logger.error(f"Tipo non valido per lingua_guida: {type(data['lingua_guida'])}")
-                    return False, "La lingua della guida deve essere una stringa", corrected_data
-                corrected_data['lingua_guida'] = data['lingua_guida'].strip().lower()
-                logger.info(f"Lingua guida corretta: {corrected_data['lingua_guida']}")
             
-            logger.info(f"Dati corretti finali: {corrected_data}")
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
             return True, "Dati validi", corrected_data
             
         except Exception as e:
-            logger.error(f"Errore durante la validazione: {str(e)}", exc_info=True)
+            print(f"[ERROR] Errore durante la validazione: {str(e)}")
             return False, f"Errore durante la validazione: {str(e)}", corrected_data
     
-    
-
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """
-        Verifica e aggiorna tutti i campi del template citta_arte
+        Verifica e aggiorna tutti i campi del template città e arte
         
         Args:
             data: Dizionario contenente i dati da verificare
@@ -208,19 +183,27 @@ class CittaArteTemplate:
         Returns:
             Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
         """
+        print("[DEBUG] Inizio verifica_template città e arte")
+        print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
         updated_data = data.copy()
         
         try:
+            # Chiama il metodo della classe base per la validazione standard
+            print("[DEBUG] Chiamata verifica_template della classe base")
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
+            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
+            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
             
-            # Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
-            
+            print("[DEBUG] Verifica template completata")
+            print(f"[DEBUG] Dati aggiornati: {updated_data}")
             return updated_data, warnings, errors
             
         except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            error_msg = f"Errore durante la verifica del template: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            errors.append(error_msg)
             return updated_data, warnings, errors 

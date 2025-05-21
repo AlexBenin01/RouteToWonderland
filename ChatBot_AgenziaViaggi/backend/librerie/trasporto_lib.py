@@ -12,12 +12,12 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
+from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
-class TrasportoTemplate:
-    def __init__(self, template_name="trasporto"):
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
-        self.template_data = self._load_template()
+class TrasportoTemplate(BaseTemplate):
+    def __init__(self, template_manager: TemplateManager):
+        super().__init__(template_manager)
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
     
@@ -167,8 +167,8 @@ class TrasportoTemplate:
 
             print("Esecuzione query per trovare il tipo di veicolo più simile...")
             cursor.execute("""
-                SELECT tipo_veicolo, embedding_veicolo <=> %s::vector as distanza
-                FROM veicoli
+                SELECT veicolo, embedding_veicolo <=> %s::vector as distanza
+                FROM tipo_trasporto
                 WHERE embedding_veicolo IS NOT NULL
                 ORDER BY distanza ASC
                 LIMIT 1
@@ -209,8 +209,7 @@ class TrasportoTemplate:
 
     def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Valida i dati in input secondo il template dei trasporti.
-        Verifica sia il tipo di veicolo che il luogo di partenza.
+        Valida i dati in input secondo il template
         
         Args:
             data: Dizionario contenente i dati da validare
@@ -218,32 +217,44 @@ class TrasportoTemplate:
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        corrected_data = {}
+        print("[DEBUG] Inizio validazione dati trasporto")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        corrected_data = data.copy()
         
         try:
-            # Validazione tipo di veicolo
+            # Validazione tipo_veicolo usando verifica_tipo_veicolo
             if 'tipo_veicolo' in data:
-                is_valid, msg, tipo_veicolo_data = self.verifica_tipo_veicolo(data)
+                print(f"[DEBUG] Validazione tipo_veicolo: {data['tipo_veicolo']}")
+                is_valid, msg, updated_data = self.verifica_tipo_veicolo(data)
                 if not is_valid:
+                    print(f"[ERROR] {msg}")
+                    corrected_data['tipo_veicolo'] = ""
                     return False, msg, corrected_data
-                corrected_data.update(tipo_veicolo_data)
+                corrected_data.update(updated_data)
+                print(f"[DEBUG] tipo_veicolo valido: {corrected_data['tipo_veicolo']}")
 
-            # Validazione luogo di partenza
+            # Validazione luogo_partenza usando verifica_luogo
             if 'luogo_partenza' in data:
-                is_valid, msg, luogo_data = self.verifica_luogo(data)
+                print(f"[DEBUG] Validazione luogo_partenza: {data['luogo_partenza']}")
+                is_valid, msg, updated_data = self.verifica_luogo(data)
                 if not is_valid:
+                    print(f"[ERROR] {msg}")
+                    corrected_data['luogo_partenza'] = ""
                     return False, msg, corrected_data
-                corrected_data.update(luogo_data)
+                corrected_data.update(updated_data)
+                print(f"[DEBUG] luogo_partenza valido: {corrected_data['luogo_partenza']}")
             
-            return True, "Dati dei trasporti validati con successo", corrected_data
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
+            return True, "Dati validi", corrected_data
             
         except Exception as e:
-            return False, f"Errore durante la validazione dei dati: {str(e)}", corrected_data
-
+            print(f"[ERROR] Errore durante la validazione: {str(e)}")
+            return False, f"Errore durante la validazione: {str(e)}", corrected_data
+    
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """
-        Verifica e aggiorna tutti i campi del template dei trasporti.
-        Controlla la validità dei dati e gestisce eventuali errori.
+        Verifica e aggiorna tutti i campi del template trasporto
         
         Args:
             data: Dizionario contenente i dati da verificare
@@ -251,18 +262,27 @@ class TrasportoTemplate:
         Returns:
             Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
         """
+        print("[DEBUG] Inizio verifica_template trasporto")
+        print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
         updated_data = data.copy()
         
         try:
-            # Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
+            # Chiama il metodo della classe base per la validazione standard
+            print("[DEBUG] Chiamata verifica_template della classe base")
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
+            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
+            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
             
+            print("[DEBUG] Verifica template completata")
+            print(f"[DEBUG] Dati aggiornati: {updated_data}")
             return updated_data, warnings, errors
             
         except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            error_msg = f"Errore durante la verifica del template: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            errors.append(error_msg)
             return updated_data, warnings, errors 

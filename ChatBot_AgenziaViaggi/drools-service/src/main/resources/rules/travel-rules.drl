@@ -6,6 +6,42 @@ import java.util.List;
 
 global List<String> activeTemplates;
 
+// Regola per attivare tutti i template corrispondenti ai mood
+rule "Attiva Template per Mood"
+    when
+        $pref : TravelPreference($mood : moodVacanza)
+    then
+        if ($mood.contains("mare")) {
+            activeTemplates.add("mare");
+            activeTemplates.add("alloggi");
+        }
+        if ($mood.contains("montagna")) {
+            activeTemplates.add("montagna");
+            activeTemplates.add("alloggi");
+        }
+        if ($mood.contains("cultura") || $mood.contains("arte") || $mood.contains("citta_arte")) {
+            activeTemplates.add("citta_arte");
+            activeTemplates.add("alloggi");
+        }
+        if ($mood.contains("gastronomia")) {
+            activeTemplates.add("gastronomia");
+            activeTemplates.add("alloggi");
+        }
+        if ($mood.contains("benessere")) {
+            activeTemplates.add("benessere");
+            activeTemplates.add("alloggi");
+        }
+        if ($mood.contains("avventura")) {
+            activeTemplates.add("avventura");
+            activeTemplates.add("alloggi");
+            activeTemplates.add("noleggi");
+        }
+        if ($mood.contains("natura")) {
+            activeTemplates.add("naturalistico");
+            activeTemplates.add("alloggi");
+        }
+end 
+
 // Regole per il tipo di partecipanti
 rule "Regola Famiglia"
     when
@@ -113,4 +149,5 @@ rule "Periodo Invernale"
         $pref : TravelPreference(departureDate matches ".*-(0[1-2]|12)-.*")
     then
         activeTemplates.add("montagna");
-end 
+end
+

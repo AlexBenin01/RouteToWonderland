@@ -49,12 +49,11 @@ public class RuleService {
         }
 
         KieSession kieSession = kieContainer.newKieSession("ksession-rules");
-        Set<String> activeTemplates = new HashSet<>();
+        List<String> activeTemplates = new ArrayList<>();
         
         try {
             logger.info("Inizio valutazione regole Drools");
             kieSession.setGlobal("activeTemplates", activeTemplates);
-            kieSession.setGlobal("logger", logger);
             kieSession.insert(preference);
             kieSession.fireAllRules();
             logger.info("Valutazione regole completata. Templates attivi: {}", activeTemplates);
@@ -62,8 +61,7 @@ public class RuleService {
             kieSession.dispose();
         }
         
-        // Converti il Set in List per mantenere la compatibilità con l'interfaccia esistente
-        return new ArrayList<>(activeTemplates);
+        return activeTemplates;
     }
 
     private boolean isIntroTemplateComplete(TravelPreference preference) {

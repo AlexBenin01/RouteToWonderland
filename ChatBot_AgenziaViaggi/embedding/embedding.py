@@ -29,6 +29,7 @@ try:
     cursor.execute("ALTER TABLE attivita_montagna ADD COLUMN IF NOT EXISTS embedding_attivita VECTOR(768);")
     cursor.execute("ALTER TABLE attivita_naturalistiche ADD COLUMN IF NOT EXISTS embedding_attivita VECTOR(768);")
     cursor.execute("ALTER TABLE tipo_trasporto ADD COLUMN IF NOT EXISTS embedding_veicolo VECTOR(768);")
+    cursor.execute("ALTER TABLE tipo_alloggi ADD COLUMN IF NOT EXISTS embedding_tipo_alloggi VECTOR(768);")
     conn.commit()
 
     # 1. Recupera valori unici
@@ -73,6 +74,9 @@ try:
 
     cursor.execute("SELECT DISTINCT veicolo FROM tipo_trasporto WHERE veicolo IS NOT NULL;")
     veicoli = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute("SELECT DISTINCT alloggi FROM tipo_alloggi WHERE alloggi IS NOT NULL;")
+    alloggi = [row[0] for row in cursor.fetchall()]
 
     # 2. Embedding con Nomic
     def genera_embedding(lista_valori):
@@ -131,6 +135,8 @@ try:
 
     print("Generazione embedding per tipo_trasporto...")
     emb_tipo_trasporto = genera_embedding(veicoli)
+    print("Generazione embedding per tipo_alloggi...")
+    emb_tipo_alloggi = genera_embedding(alloggi)
 
 
     # 3. Salva nel DB
@@ -232,6 +238,12 @@ try:
             UPDATE tipo_trasporto
             SET embedding_veicolo = %s
             WHERE veicolo = %s
+        """, (emb, veicolo)),
+    for veicolo, emb in zip(alloggi, emb_tipo_trasporto):
+        cursor.execute("""
+            UPDATE tipo_alloggi
+            SET embedding_tipo_alloggi = %s
+            WHERE alloggi = %s
         """, (emb, veicolo))
     
 

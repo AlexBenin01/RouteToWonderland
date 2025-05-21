@@ -12,12 +12,12 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
+from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
-class BenessereTemplate:
-    def __init__(self, template_name="benessere"):
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
-        self.template_data = self._load_template()
+class BenessereTemplate(BaseTemplate):
+    def __init__(self, template_manager: TemplateManager):
+        super().__init__(template_manager)
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
     
@@ -128,25 +128,48 @@ class BenessereTemplate:
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        corrected_data = {}
+        print("[DEBUG] Inizio validazione dati benessere")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        corrected_data = data.copy()
+        template_data = self.get_template_data()
         
         try:
-            # Validazione tipo_benessere
-            if 'trattamenti' in data:
-                is_valid, msg, trattamenti_data = self.validate_trattamenti(data)
-                if not is_valid:
-                    return False, msg, corrected_data
-                corrected_data.update(trattamenti_data)
+            # Validazione tipo_attivita
+            if 'tipo_attivita' in data:
+                print(f"[DEBUG] Validazione tipo_attivita: {data['tipo_attivita']}")
+                valid_types = template_data.get('tipo_attivita', [])
+                print(f"[DEBUG] Tipi validi: {valid_types}")
+                if data['tipo_attivita'] not in valid_types:
+                    print(f"[ERROR] tipo_attivita non valido: {data['tipo_attivita']}")
+                    corrected_data['tipo_attivita'] = ""
+                    return False, f"Il tipo di attività deve essere tra: {', '.join(valid_types)}", corrected_data
+                print(f"[DEBUG] tipo_attivita valido: {data['tipo_attivita']}")
 
-        
+            # Validazione preferenze_attivita
+            if 'preferenze_attivita' in data:
+                print(f"[DEBUG] Validazione preferenze_attivita: {data['preferenze_attivita']}")
+                valid_prefs = template_data.get('preferenze_attivita', [])
+                print(f"[DEBUG] Preferenze valide: {valid_prefs}")
+                if isinstance(data['preferenze_attivita'], list):
+                    if not all(pref in valid_prefs for pref in data['preferenze_attivita']):
+                        print(f"[ERROR] preferenze_attivita non valide: {data['preferenze_attivita']}")
+                        corrected_data['preferenze_attivita'] = []
+                        return False, f"Le preferenze di attività devono essere tra: {', '.join(valid_prefs)}", corrected_data
+                else:
+                    if data['preferenze_attivita'] not in valid_prefs:
+                        print(f"[ERROR] preferenze_attivita non valida: {data['preferenze_attivita']}")
+                        corrected_data['preferenze_attivita'] = []
+                        return False, f"La preferenza di attività deve essere tra: {', '.join(valid_prefs)}", corrected_data
+                print(f"[DEBUG] preferenze_attivita valide: {data['preferenze_attivita']}")
             
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
             return True, "Dati validi", corrected_data
             
         except Exception as e:
+            print(f"[ERROR] Errore durante la validazione: {str(e)}")
             return False, f"Errore durante la validazione: {str(e)}", corrected_data
     
-
-
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """
         Verifica e aggiorna tutti i campi del template benessere
@@ -157,19 +180,27 @@ class BenessereTemplate:
         Returns:
             Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
         """
+        print("[DEBUG] Inizio verifica_template benessere")
+        print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
         updated_data = data.copy()
         
         try:
+            # Chiama il metodo della classe base per la validazione standard
+            print("[DEBUG] Chiamata verifica_template della classe base")
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
+            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
+            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
             
-            # Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
-            
+            print("[DEBUG] Verifica template completata")
+            print(f"[DEBUG] Dati aggiornati: {updated_data}")
             return updated_data, warnings, errors
             
         except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            error_msg = f"Errore durante la verifica del template: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            errors.append(error_msg)
             return updated_data, warnings, errors 

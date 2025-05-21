@@ -13,21 +13,14 @@ import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
 
-class IntroTemplate:
+class IntroTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
-        self.template_manager = template_manager
+        super().__init__(template_manager)
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
-    
-    def set_template(self, template_name: str) -> bool:
-        """Cambia il template attivo"""
-        return self.template_manager.set_active_template(template_name)
-    
-    def get_template_data(self) -> Dict[str, Any]:
-        """Ottiene i dati del template attivo"""
-        return self.template_manager.get_active_template()
     
     def _adjust_past_date(self, date_str: str) -> str:
         """
@@ -189,13 +182,10 @@ class IntroTemplate:
             if not is_valid_mood:
                 errors.append(msg_mood)
             
-            # 3. Verifica e normalizza i dati
-            updated_data = self.process_data(updated_data)
-            
-            # 4. Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
+            # 4. Chiama il metodo della classe base per la validazione standard
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
             
             return updated_data, warnings, errors
             

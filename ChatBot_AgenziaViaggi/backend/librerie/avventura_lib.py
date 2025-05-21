@@ -12,12 +12,12 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
+from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
-class AvventuraTemplate:
-    def __init__(self, template_name="avventura"):
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
-        self.template_data = self._load_template()
+class AvventuraTemplate(BaseTemplate):
+    def __init__(self, template_manager: TemplateManager):
+        super().__init__(template_manager)
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
     
@@ -36,8 +36,6 @@ class AvventuraTemplate:
         self.template_name = template_name
         self.template_path = f"template/{template_name}.json"
         self.template_data = self._load_template()
-
-
 
     def validate_difficolta(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
@@ -213,53 +211,70 @@ class AvventuraTemplate:
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        corrected_data = {}
+        print("[DEBUG] Inizio validazione dati avventura")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        corrected_data = data.copy()
         
         try:
-            # Validazione attività
+            # Validazione attivita usando validate_attivita
             if 'attivita' in data:
-                is_valid, msg, attivita_data = self.validate_attivita(data)
+                print(f"[DEBUG] Validazione attivita: {data['attivita']}")
+                is_valid, error_msg, corrected_data = self.validate_attivita(corrected_data)
                 if not is_valid:
-                    return False, msg, corrected_data
-                corrected_data.update(attivita_data)
+                    print(f"[ERROR] Validazione attivita fallita: {error_msg}")
+                    return False, error_msg, corrected_data
+                print(f"[DEBUG] attivita validata con successo: {corrected_data['attivita']}")
 
-            # Validazione livello_difficolta
-            if 'livello_difficolta' in data:
-                is_valid, msg, difficolta_data = self.validate_difficolta(data)
+            # Validazione livello_difficoltà usando validate_difficolta
+            if 'livello_difficoltà' in data:
+                print(f"[DEBUG] Validazione livello_difficoltà: {data['livello_difficoltà']}")
+                is_valid, error_msg, corrected_data = self.validate_difficolta(corrected_data)
                 if not is_valid:
-                    return False, msg, corrected_data
-                corrected_data.update(difficolta_data)
+                    print(f"[ERROR] Validazione livello_difficoltà fallita: {error_msg}")
+                    return False, error_msg, corrected_data
+                print(f"[DEBUG] livello_difficoltà validato con successo: {corrected_data['livello_difficoltà']}")
 
-            # Validazione attrezzatura_necessaria
+            # Validazione attrezzatura_necessaria (solo verifica inizializzazione)
             if 'attrezzatura_necessaria' in data:
-                if not isinstance(data['attrezzatura_necessaria'], bool):
-                    return False, "Il campo attrezzatura_necessaria deve essere un booleano", corrected_data
-                corrected_data['attrezzatura_necessaria'] = data['attrezzatura_necessaria']
+                print(f"[DEBUG] Verifica attrezzatura_necessaria: {data['attrezzatura_necessaria']}")
+                if data['attrezzatura_necessaria'] is None:
+                    print(f"[ERROR] attrezzatura_necessaria non inizializzato")
+                    return False, "Il campo attrezzatura_necessaria deve essere inizializzato", corrected_data
+                print(f"[DEBUG] attrezzatura_necessaria inizializzato: {data['attrezzatura_necessaria']}")
 
-            # Validazione guida_esperta
+            # Validazione guida_esperta e gestione lingua_guida
             if 'guida_esperta' in data:
+                print(f"[DEBUG] Validazione guida_esperta: {data['guida_esperta']}")
                 if not isinstance(data['guida_esperta'], bool):
-                    return False, "Il campo guida_esperta deve essere un booleano", corrected_data
-                corrected_data['guida_esperta'] = data['guida_esperta']
+                    print(f"[ERROR] guida_esperta non è un booleano: {data['guida_esperta']}")
+                    corrected_data['guida_esperta'] = False
+                    return False, "Il campo guida_esperta deve essere un booleano (true/false)", corrected_data
                 
-                # Se guida_esperta è False, imposta lingua_guida a "no guida"
+                # Se guida_esperta è false, imposta lingua_guida a "no guida"
                 if not data['guida_esperta']:
+                    print("[DEBUG] guida_esperta è false, imposto lingua_guida a 'no guida'")
                     corrected_data['lingua_guida'] = "no guida"
-                    return True, "Dati validi", corrected_data
+                print(f"[DEBUG] guida_esperta valido: {data['guida_esperta']}")
 
-            # Validazione lingua_guida (solo se guida_esperta è True)
-            if 'lingua_guida' in data and data.get('guida_esperta', False):
-                if not isinstance(data['lingua_guida'], str):
-                    return False, "La lingua della guida deve essere una stringa", corrected_data
-                corrected_data['lingua_guida'] = data['lingua_guida'].strip().lower()
-            
+            # Verifica lingua_guida
+            if 'lingua_guida' in data:
+                print(f"[DEBUG] Verifica lingua_guida: {data['lingua_guida']}")
+                if not data['lingua_guida'] or data['lingua_guida'].strip() == "":
+                    print(f"[ERROR] lingua_guida è vuoto")
+                    if corrected_data.get('guida_esperta', False):
+                        return False, "Il campo lingua_guida è obbligatorio quando è richiesta una guida", corrected_data
+                    else:
+                        corrected_data['lingua_guida'] = "no guida"
+                print(f"[DEBUG] lingua_guida valido: {data['lingua_guida']}")
+
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
             return True, "Dati validi", corrected_data
             
         except Exception as e:
+            print(f"[ERROR] Errore durante la validazione: {str(e)}")
             return False, f"Errore durante la validazione: {str(e)}", corrected_data
     
-    
-
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """
         Verifica e aggiorna tutti i campi del template avventura
@@ -275,13 +290,13 @@ class AvventuraTemplate:
         updated_data = data.copy()
         
         try:
+            # Chiama il metodo della classe base per la validazione standard
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
             
-            # Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
+            return updated_data, warnings, errors
             
-            return updated_data, warnings, errors 
         except Exception as e:
             errors.append(f"Errore durante la verifica del template: {str(e)}")
             return updated_data, warnings, errors 

@@ -1,4 +1,4 @@
 {
   "posti_auto": "integer",
-  "tipo_cambio": "boolean"
+  "cambio_automatico": "boolean"
 }

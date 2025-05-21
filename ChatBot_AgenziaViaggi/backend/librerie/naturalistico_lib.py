@@ -12,12 +12,12 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
+from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
-class NaturalisticoTemplate:
-    def __init__(self, template_name="naturalistico"):
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
-        self.template_data = self._load_template()
+class NaturalisticoTemplate(BaseTemplate):
+    def __init__(self, template_manager: TemplateManager):
+        super().__init__(template_manager)
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
     
@@ -133,47 +133,47 @@ class NaturalisticoTemplate:
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
+        print("[DEBUG] Inizio validazione dati naturalistico")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        corrected_data = data.copy()
+        
         try:
-            corrected_data = data.copy()
+            # Validazione attivita usando validate_attivita
+            if 'attivita' in data:
+                print(f"[DEBUG] Validazione attivita: {data['attivita']}")
+                is_valid, error_msg, corrected_data = self.validate_attivita(corrected_data)
+                if not is_valid:
+                    print(f"[ERROR] Validazione attivita fallita: {error_msg}")
+                    return False, error_msg, corrected_data
+                print(f"[DEBUG] attivita validata con successo: {corrected_data['attivita']}")
 
-            # Validazione attività_naturalistiche
-            if 'attività_naturalistiche' in data:
-                valid_activities = self.template_data['attività_naturalistiche']['enum']
-                if not isinstance(data['attività_naturalistiche'], list):
-                    return False, "Le attività naturalistiche devono essere specificate come lista", corrected_data
-                if not all(activity.lower() in [a.lower() for a in valid_activities] for activity in data['attività_naturalistiche']):
-                    return False, f"Una o più attività naturalistiche non valide. Valori accettati: {', '.join(valid_activities)}", corrected_data
-                corrected_data['attività_naturalistiche'] = [activity.lower() for activity in data['attività_naturalistiche']]
-
-                        # Validazione guida_esperta
+            # Validazione guida_naturalistica e gestione lingua_guida
             if 'guida_naturalistica' in data:
+                print(f"[DEBUG] Validazione guida_naturalistica: {data['guida_naturalistica']}")
                 if not isinstance(data['guida_naturalistica'], bool):
-                    return False, "Il campo guida_naturalistica deve essere un booleano", corrected_data
-                corrected_data['guida_naturalistica'] = data['guida_naturalistica']
+                    print(f"[ERROR] guida_naturalistica non è un booleano: {data['guida_naturalistica']}")
+                    corrected_data['guida_naturalistica'] = False
+                    return False, "Il campo guida_naturalistica deve essere un booleano (true/false)", corrected_data
                 
-                # Se richiesta_guida_turistica è False, imposta lingua_guida a "no guida"
+                # Se guida_naturalistica è false, imposta lingua_guida a "no guida"
                 if not data['guida_naturalistica']:
+                    print("[DEBUG] guida_naturalistica è false, imposto lingua_guida a 'no guida'")
                     corrected_data['lingua_guida'] = "no guida"
-                    return True, "Dati validi", corrected_data
-
-            # Validazione lingua_guida (solo se guida_esperta è True)
-            if 'lingua_guida' in data and data.get('guida_naturalistica', False):
-                if not isinstance(data['lingua_guida'], str):
-                    return False, "La lingua della guida deve essere una stringa", corrected_data
-                corrected_data['lingua_guida'] = data['lingua_guida'].strip().lower()
+                else:
+                    # Se guida_naturalistica è true, verifica che lingua_guida sia valorizzata
+                    if 'lingua_guida' not in data or not data['lingua_guida'] or data['lingua_guida'].strip() == "":
+                        print(f"[ERROR] lingua_guida non valorizzata quando guida_naturalistica è true")
+                        return False, "Il campo lingua_guida è obbligatorio quando è richiesta una guida", corrected_data
+                print(f"[DEBUG] guida_naturalistica valido: {data['guida_naturalistica']}")
             
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
             return True, "Dati validi", corrected_data
             
         except Exception as e:
-            return False, f"Errore durante la validazione: {str(e)}", corrected_data
-            
-            return True, "Dati validi", corrected_data
-            
-        except Exception as e:
+            print(f"[ERROR] Errore durante la validazione: {str(e)}")
             return False, f"Errore durante la validazione: {str(e)}", corrected_data
     
-    
-
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """
         Verifica e aggiorna tutti i campi del template naturalistico
@@ -184,19 +184,27 @@ class NaturalisticoTemplate:
         Returns:
             Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
         """
+        print("[DEBUG] Inizio verifica_template naturalistico")
+        print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
         updated_data = data.copy()
         
         try:
-
-            # Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
+            # Chiama il metodo della classe base per la validazione standard
+            print("[DEBUG] Chiamata verifica_template della classe base")
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
+            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
+            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
             
+            print("[DEBUG] Verifica template completata")
+            print(f"[DEBUG] Dati aggiornati: {updated_data}")
             return updated_data, warnings, errors
             
         except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            error_msg = f"Errore durante la verifica del template: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            errors.append(error_msg)
             return updated_data, warnings, errors 

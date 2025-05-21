@@ -1,6 +1,6 @@
 """
 Libreria per la gestione del template gastronomia.json
-Gestisce le preferenze per le attività gastronomiche
+Gestisce le informazioni relative alle attività gastronomiche
 """
 
 import json
@@ -12,52 +12,33 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
+from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
-class GastronomiaTemplate:
-    def __init__(self, template_name="gastronomia"):
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
-        self.template_data = self._load_template()
-        self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
-        self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
-    
-    def _load_template(self) -> Dict[str, Any]:
-        """Carica il template JSON"""
-        try:
-            with open(self.template_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            print(f"Template {self.template_name} non trovato, uso il template di default")
-            with open("template/gastronomia.json", 'r', encoding='utf-8') as f:
-                return json.load(f)
-    
-    def set_template(self, template_name: str):
-        """Cambia il template attivo"""
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
-        self.template_data = self._load_template()
+
+class GastronomiaTemplate(BaseTemplate):
+    def __init__(self, template_manager: TemplateManager):
+        super().__init__(template_manager)
 
 
     def validate_degustazione(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Valida le degustazioni usando l'embedding per trovare corrispondenze nel database
+        Verifica il tipo di degustazione usando gli embedding.
+        Controlla che il tipo di degustazione inserito corrisponda a un tipo valido nel database.
         
         Args:
-            data: Dizionario contenente i dati da validare
+            data: Dizionario contenente i dati da verificare
             
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        corrected_data = {}
-        
         try:
-            if 'degustazioni' not in data or not data['degustazioni']:
-                return True, "Le degustazioni sono opzionali", corrected_data
+            if 'degustazione' not in data or not data['degustazione']:
+                print("Tipo degustazione mancante o vuoto")
+                return False, "Il tipo di degustazione è obbligatorio", data
 
-            # Converti in lista se è una stringa singola
-            degustazioni_list = data['degustazioni'] if isinstance(data['degustazioni'], list) else [data['degustazioni']]
-            print(f"Verifica degustazioni per: {degustazioni_list}")
-
+            print(f"Verifica tipo degustazione: {data['degustazione']}")
+            
             print("Tentativo di connessione al database...")
             conn = psycopg2.connect(
                 dbname="routeToWonderland",
@@ -69,58 +50,60 @@ class GastronomiaTemplate:
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
-            degustazioni_corrette = []
-            for degustazione in degustazioni_list:
-                try:
-                    print(f"Generazione embedding per degustazione: '{degustazione}'")
-                    degustazione_embedding = self.model.encode(degustazione)
-                    print(f"Embedding generato con successo, dimensione: {len(degustazione_embedding)}")
-                    degustazione_embedding = degustazione_embedding.tolist()
+            try:
+                print("Generazione embedding per il tipo di degustazione...")
+                print(f"Testo da convertire in embedding: '{data['degustazione']}'")
+                degustazione_embedding = self.model.encode(data['degustazione'])
+                print(f"Embedding generato con successo, dimensione: {len(degustazione_embedding)}")
+                degustazione_embedding = degustazione_embedding.tolist()
+            except Exception as e:
+                print(f"Errore durante la generazione dell'embedding: {str(e)}")
+                print(f"Tipo di errore: {type(e)}")
+                import traceback
+                print("Stack trace:")
+                print(traceback.format_exc())
+                raise
 
-                    print("Esecuzione query per trovare la degustazione più simile...")
-                    cursor.execute("""
-                        SELECT degustazione, embedding_degustazione <=> %s::vector as distanza
-                        FROM degustazioni
-                        WHERE embedding_degustazione IS NOT NULL
-                        ORDER BY distanza ASC
-                        LIMIT 1
-                    """, (degustazione_embedding,))
-                    
-                    risultato = cursor.fetchall()
-                    print(f"Risultato query: {risultato}")
-
-                    if risultato:
-                        degustazione_corretta, distanza = risultato[0]
-                        print(f"Distanza trovata: {distanza}")
-                        if distanza < 0.4:
-                            print(f"Aggiornamento degustazione da '{degustazione}' a '{degustazione_corretta}'")
-                            degustazioni_corrette.append(degustazione_corretta)
-                        else:
-                            print(f"Degustazione '{degustazione}' non ha corrispondenze sufficientemente simili")
-                            degustazioni_corrette.append(degustazione)
-                    else:
-                        print(f"Nessun risultato trovato per la degustazione '{degustazione}'")
-                        degustazioni_corrette.append(degustazione)
-
-                except Exception as e:
-                    print(f"Errore durante la generazione dell'embedding per '{degustazione}': {str(e)}")
-                    print(f"Tipo di errore: {type(e)}")
-                    import traceback
-                    print("Stack trace:")
-                    print(traceback.format_exc())
-                    degustazioni_corrette.append(degustazione)
-
-            corrected_data['degustazioni'] = degustazioni_corrette
-            print(f"Degustazioni finali: {degustazioni_corrette}")
-            return True, "Degustazioni verificate", corrected_data
+            print("Esecuzione query per trovare il tipo di degustazione più simile...")
+            cursor.execute("""
+                SELECT degustazione, embedding_degustazione <=> %s::vector as distanza
+                FROM degustazione
+                WHERE embedding_degustazione IS NOT NULL
+                ORDER BY distanza ASC
+                LIMIT 1
+            """, (degustazione_embedding,))
+            
+            risultato = cursor.fetchall()
+            print(f"Risultato query: {risultato}")
+            
+            if risultato:
+                tipo_degustazione_corretto, distanza = risultato[0]
+                print(f"Distanza trovata: {distanza}")
+                if distanza > 0.4:
+                    print(f"Distanza troppo grande ({distanza} > 0.4), rimuovo il valore")
+                    data['degustazione'] = None
+                    return False, "Nessun tipo di degustazione simile trovato nel database", data
+                
+                print(f"Aggiornamento tipo degustazione da '{data['degustazione']}' a '{tipo_degustazione_corretto}'")
+                data['degustazione'] = tipo_degustazione_corretto
+                return True, "Tipo di degustazione verificato e corretto", data
+            else:
+                print("Nessun risultato trovato nel database, rimuovo il valore")
+                data['degustazione'] = None
+                return False, "Nessun tipo di degustazione trovato nel database", data
 
         except Exception as e:
-            print(f"Errore durante la verifica delle degustazioni: {str(e)}")
-            return False, f"Errore durante la verifica delle degustazioni: {str(e)}", corrected_data
+            print(f"Errore durante la verifica del tipo di degustazione: {str(e)}")
+            import traceback
+            print("Stack trace:")
+            print(traceback.format_exc())
+            return False, f"Errore durante la verifica del tipo di degustazione: {str(e)}", data
         finally:
             if 'cursor' in locals():
+                print("Chiusura cursor")
                 cursor.close()
             if 'conn' in locals():
+                print("Chiusura connessione")
                 conn.close()
     
     def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
@@ -133,51 +116,38 @@ class GastronomiaTemplate:
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        corrected_data = {}
+        print("[DEBUG] Inizio validazione dati gastronomia")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        corrected_data = data.copy()
+        template_data = self.get_template_data()
+        
         try:
-            # Validazione corsi_cucina
+            # Validazione corsi_cucina (booleano)
             if 'corsi_cucina' in data:
+                print(f"[DEBUG] Validazione corsi_cucina: {data['corsi_cucina']}")
                 if not isinstance(data['corsi_cucina'], bool):
-                    return False, "Il campo corsi_cucina deve essere un booleano", corrected_data
-                corrected_data['corsi_cucina'] = data['corsi_cucina']
+                    print(f"[ERROR] corsi_cucina non è un booleano: {data['corsi_cucina']}")
+                    corrected_data['corsi_cucina'] = False
+                    return False, "Il campo corsi_cucina deve essere un booleano (true/false)", corrected_data
+                print(f"[DEBUG] corsi_cucina valido: {data['corsi_cucina']}")
 
-            # Validazione degustazioni
-            if 'degustazioni' in data:
-                is_valid, msg, degustazioni_data = self.validate_degustazione(data)
+            # Validazione degustazione usando validate_degustazione
+            if 'degustazione' in data:
+                print(f"[DEBUG] Validazione degustazione: {data['degustazione']}")
+                is_valid, error_msg, corrected_data = self.validate_degustazione(corrected_data)
                 if not is_valid:
-                    return False, msg, corrected_data
-                corrected_data.update(degustazioni_data)
-            
+                    print(f"[ERROR] Validazione degustazione fallita: {error_msg}")
+                    return False, error_msg, corrected_data
+                print(f"[DEBUG] degustazione validata con successo: {corrected_data['degustazione']}")
+
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
             return True, "Dati validi", corrected_data
             
         except Exception as e:
+            print(f"[ERROR] Errore durante la validazione: {str(e)}")
             return False, f"Errore durante la validazione: {str(e)}", corrected_data
     
-    def process_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Elabora i dati secondo le regole del template
-        
-        Args:
-            data: Dizionario contenente i dati da elaborare
-            
-        Returns:
-            Dict[str, Any]: Dati elaborati
-        """
-        processed_data = {}
-        
-        # Mantieni i booleani come sono
-        if 'corsi_cucina' in data:
-            processed_data['corsi_cucina'] = data['corsi_cucina']
-
-        # Normalizza le degustazioni
-        if 'degustazioni' in data:
-            if isinstance(data['degustazioni'], list):
-                processed_data['degustazioni'] = [item.strip().lower() for item in data['degustazioni']]
-            else:
-                processed_data['degustazioni'] = data['degustazioni'].strip().lower()
-        
-        return processed_data
-
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """
         Verifica e aggiorna tutti i campi del template gastronomia
@@ -188,21 +158,27 @@ class GastronomiaTemplate:
         Returns:
             Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
         """
+        print("[DEBUG] Inizio verifica_template gastronomia")
+        print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
         updated_data = data.copy()
         
         try:
-            # Verifica e normalizza i dati
-            updated_data = self.process_data(updated_data)
+            # Chiama il metodo della classe base per la validazione standard
+            print("[DEBUG] Chiamata verifica_template della classe base")
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
+            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
+            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
             
-            # Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
-            
+            print("[DEBUG] Verifica template completata")
+            print(f"[DEBUG] Dati aggiornati: {updated_data}")
             return updated_data, warnings, errors
             
         except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            error_msg = f"Errore durante la verifica del template: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            errors.append(error_msg)
             return updated_data, warnings, errors 

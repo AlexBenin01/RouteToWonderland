@@ -12,11 +12,14 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
+from .template_manager import TemplateManager
+from .base_template import BaseTemplate
 
-class MareTemplate:
-    def __init__(self, template_name="mare"):
-        self.template_name = template_name
-        self.template_path = f"template/{template_name}.json"
+class MareTemplate(BaseTemplate):
+    def __init__(self, template_manager: TemplateManager):
+        super().__init__(template_manager)
+        self.template_name = "mare"
+        self.template_path = f"template/{self.template_name}.json"
         self.template_data = self._load_template()
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
@@ -133,26 +136,34 @@ class MareTemplate:
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
+        print("[DEBUG] Inizio validazione dati mare")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        corrected_data = data.copy()
+        
         try:
-            corrected_data = data.copy()
+            # Validazione attivita usando validate_attivita
+            if 'attivita' in data:
+                print(f"[DEBUG] Validazione tipo_attivita: {data['tipo_attivita']}")
+                is_valid, error_msg, corrected_data = self.validate_attivita(corrected_data)
+                if not is_valid:
+                    print(f"[ERROR] Validazione tipo_attivita fallita: {error_msg}")
+                    return False, error_msg, corrected_data
+                print(f"[DEBUG] tipo_attivita validato con successo: {corrected_data['tipo_attivita']}")
 
             # Validazione attrezzatura
             if 'attrezzatura' in data:
-                if not isinstance(data['attrezzatura'], bool):
-                    return False, "Il campo attrezzatura deve essere un booleano", corrected_data
-
-            # Validazione attività_acquatiche
-            if 'attività_acquatiche' in data:
-                valid_activities = self.template_data['attività_acquatiche']['enum']
-                if not isinstance(data['attività_acquatiche'], list):
-                    return False, "Le attività acquatiche devono essere specificate come lista", corrected_data
-                if not all(activity.lower() in [a.lower() for a in valid_activities] for activity in data['attività_acquatiche']):
-                    return False, f"Una o più attività acquatiche non valide. Valori accettati: {', '.join(valid_activities)}", corrected_data
-                corrected_data['attività_acquatiche'] = [activity.lower() for activity in data['attività_acquatiche']]
+                print(f"[DEBUG] Verifica attrezzatura: {data['attrezzatura']}")
+                if data['attrezzatura'] is None:
+                    print(f"[ERROR] attrezzatura non inizializzato")
+                    return False, "Il campo attrezzatura deve essere inizializzato", corrected_data
+                print(f"[DEBUG] attrezzatura inizializzato: {data['attrezzatura']}")
             
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
             return True, "Dati validi", corrected_data
             
         except Exception as e:
+            print(f"[ERROR] Errore durante la validazione: {str(e)}")
             return False, f"Errore durante la validazione: {str(e)}", corrected_data
     
     def process_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -175,7 +186,7 @@ class MareTemplate:
 
                 # Validazione attività
                 if 'attivita' in data:
-                    is_valid, msg, attivita_data = self.validate_attivita(data)
+                    is_valid, msg, attivita_data = self.validate_attivita_mare(data)
                     if not is_valid:
                         return False, msg, corrected_data
                     corrected_data.update(attivita_data)
@@ -195,21 +206,27 @@ class MareTemplate:
         Returns:
             Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
         """
+        print("[DEBUG] Inizio verifica_template mare")
+        print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
         updated_data = data.copy()
         
         try:
-            # Verifica e normalizza i dati
-            updated_data = self.process_data(updated_data)
+            # Chiama il metodo della classe base per la validazione standard
+            print("[DEBUG] Chiamata verifica_template della classe base")
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
+            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
+            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
             
-            # Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
-            
+            print("[DEBUG] Verifica template completata")
+            print(f"[DEBUG] Dati aggiornati: {updated_data}")
             return updated_data, warnings, errors
             
         except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            error_msg = f"Errore durante la verifica del template: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            errors.append(error_msg)
             return updated_data, warnings, errors 
