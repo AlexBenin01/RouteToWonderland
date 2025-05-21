@@ -1,23 +1,5 @@
 {
-  "attivita": {
-    "type": "array",
-    "description": "elenco delle attività",
-    "items": {
-      "type": "string",
-      "enum":["museo", "galleria", "tour"]
-    },
-    "uniqueItems": true
-  },
-  "numero_partecipanti": {
-    "type": "integer",
-    "description": "numero di partecipanti"
-  },
-  "richiesta_guida_turistica": {
-    "type": "boolean",
-    "description": "true/false se si desidera una guida turistica"
-  },
-  "lingua_guida": {
-    "type": "string",
-    "description": "lingua preferita per la guida turistica"
-  }
-} 
+  "attivita": [["museo", "galleria", "tour"]],
+  "richiesta_guida_turistica": "boolean",
+  "lingua_guida": "verbatim-string"
+}

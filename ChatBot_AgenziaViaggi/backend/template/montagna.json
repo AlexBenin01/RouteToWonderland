@@ -1,11 +1,4 @@
 {  
-    "attivita": {
-        "type": "string",
-        "description": "descrizione dell'attività di montagna",
-        "enum":["sci", "snowboard", "ciaspolate", "escursioni", "spa", "visita rifugi"]
-    },
-    "attrezzatura": {
-      "type": "boolean",
-      "description": "true/false se si desidera attrezzatura"
-    }
+  "attivita": [["sci", "snowboard", "ciaspolate", "escursioni", "visita rifugi"]],
+  "attrezzatura": "boolean"
 } 

@@ -49,6 +49,24 @@ class NuExtract:
                     saved_template[key] = value
                     template_updated = True
             
+            # Gestione speciale per mood_vacanza nel template intro
+            if "mood_vacanza" in extracted_data:
+                if "mood_vacanza" not in saved_template:
+                    saved_template["mood_vacanza"] = []
+                
+                # Gestione del valore estratto
+                if isinstance(extracted_data["mood_vacanza"], list):
+                    # Se è una lista, aggiungi ogni mood non presente
+                    for mood in extracted_data["mood_vacanza"]:
+                        if mood not in saved_template["mood_vacanza"]:
+                            saved_template["mood_vacanza"].append(mood)
+                            template_updated = True
+                else:
+                    # Se è un singolo valore, aggiungilo se non presente
+                    if extracted_data["mood_vacanza"] not in saved_template["mood_vacanza"]:
+                        saved_template["mood_vacanza"].append(extracted_data["mood_vacanza"])
+                        template_updated = True
+            
             return saved_template, template_updated
             
         except Exception as e:

@@ -27,6 +27,7 @@ class OllamaManager:
     def _create_prompt(self, template_type: str, template: Dict[str, Any]) -> str:
         """Restituisce la frase guida per il prossimo campo da compilare"""
         # Se il template è vuoto, restituisci la frase guida per il primo campo del template
+        logging.getLogger(__name__).info(f"Template: {template}")
         if not template:
             # Ottieni la prima frase guida disponibile per questo tipo di template
             first_field = next(iter(self.frasi_guida.get(template_type, {})), None)

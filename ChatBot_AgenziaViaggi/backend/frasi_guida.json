@@ -10,10 +10,10 @@
         "budget_viaggio": "Qual è il tuo budget complessivo per il viaggio? (in euro)"
     },
     "contatti": {
-        "nome": "Per poterti aiutare al meglio, potresti dirmi il tuo nome?",
+        "full_name": "qual'è il tuo nome e cognome?",
         "email": "Qual è il tuo indirizzo email?",
         "telefono": "E il tuo numero di telefono?",
-        "preferenza_contatto": "Come preferisci essere contattato? (email, telefono, whatsapp)"
+        "codice_fiscale": "Potresti dirmi il tuo codice fiscale?"
     },
     "alloggi": {
         "tipo_alloggio": "Che tipo di alloggio preferisci? (hotel, appartamento, b&b, etc.)",

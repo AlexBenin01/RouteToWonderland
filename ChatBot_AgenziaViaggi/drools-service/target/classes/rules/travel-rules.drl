@@ -3,26 +3,37 @@ package com.traveltorules.rules;
 import com.traveltorules.model.TravelPreference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-global List<String> activeTemplates;
+global Set<String> activeTemplates;
+global Logger logger;
 
 // Regole per il tipo di partecipanti
 rule "Regola Famiglia"
     when
         $pref : TravelPreference(tipoPartecipanti == "famiglia")
     then
+        logger.info("Applicata Regola Famiglia per tipoPartecipanti: {}", $pref.getTipoPartecipanti());
         activeTemplates.add("famiglia");
         activeTemplates.add("alloggi");
         activeTemplates.add("noleggi");
+        logger.info("Template aggiunti: famiglia, alloggi, noleggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 rule "Regola Anziani"
     when
         $pref : TravelPreference(tipoPartecipanti == "anziani")
     then
+        logger.info("Applicata Regola Anziani per tipoPartecipanti: {}", $pref.getTipoPartecipanti());
         activeTemplates.add("benessere");
         activeTemplates.add("citta_arte");
         activeTemplates.add("alloggi");
+        logger.info("Template aggiunti: benessere, citta_arte, alloggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 // Regole per il mood della vacanza
@@ -30,57 +41,78 @@ rule "Mare Template"
     when
         $pref : TravelPreference(moodVacanza contains "mare")
     then
+        logger.info("Applicata Regola Mare per moodVacanza: {}", $pref.getMoodVacanza());
         activeTemplates.add("mare");
         activeTemplates.add("alloggi");
+        logger.info("Template aggiunti: mare, alloggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 rule "Montagna Template"
     when
         $pref : TravelPreference(moodVacanza contains "montagna")
     then
+        logger.info("Applicata Regola Montagna per moodVacanza: {}", $pref.getMoodVacanza());
         activeTemplates.add("montagna");
         activeTemplates.add("alloggi");
+        logger.info("Template aggiunti: montagna, alloggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 rule "Città d'Arte Template"
     when
         $pref : TravelPreference(moodVacanza contains "cultura" || moodVacanza contains "arte")
     then
+        logger.info("Applicata Regola Città d'Arte per moodVacanza: {}", $pref.getMoodVacanza());
         activeTemplates.add("citta_arte");
         activeTemplates.add("alloggi");
+        logger.info("Template aggiunti: citta_arte, alloggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 rule "Gastronomia Template"
     when
         $pref : TravelPreference(moodVacanza contains "gastronomia")
     then
+        logger.info("Applicata Regola Gastronomia per moodVacanza: {}", $pref.getMoodVacanza());
         activeTemplates.add("gastronomia");
         activeTemplates.add("alloggi");
+        logger.info("Template aggiunti: gastronomia, alloggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 rule "Benessere Template"
     when
         $pref : TravelPreference(moodVacanza contains "benessere")
     then
+        logger.info("Applicata Regola Benessere per moodVacanza: {}", $pref.getMoodVacanza());
         activeTemplates.add("benessere");
         activeTemplates.add("alloggi");
+        logger.info("Template aggiunti: benessere, alloggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 rule "Avventura Template"
     when
         $pref : TravelPreference(moodVacanza contains "avventura")
     then
+        logger.info("Applicata Regola Avventura per moodVacanza: {}", $pref.getMoodVacanza());
         activeTemplates.add("avventura");
         activeTemplates.add("alloggi");
         activeTemplates.add("noleggi");
+        logger.info("Template aggiunti: avventura, alloggi, noleggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 rule "Naturalistico Template"
     when
         $pref : TravelPreference(moodVacanza contains "natura")
     then
+        logger.info("Applicata Regola Naturalistico per moodVacanza: {}", $pref.getMoodVacanza());
         activeTemplates.add("naturalistico");
         activeTemplates.add("alloggi");
+        logger.info("Template aggiunti: naturalistico, alloggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 // Regole per la durata del viaggio
@@ -88,8 +120,11 @@ rule "Viaggio Lungo"
     when
         $pref : TravelPreference(tripDuration > 2)
     then
+        logger.info("Applicata Regola Viaggio Lungo per tripDuration: {}", $pref.getTripDuration());
         activeTemplates.add("alloggi");
         activeTemplates.add("noleggi");
+        logger.info("Template aggiunti: alloggi, noleggi");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 // Regole per il budget
@@ -97,7 +132,10 @@ rule "Budget Alto"
     when
         $pref : TravelPreference(budgetViaggio > 2000)
     then
+        logger.info("Applicata Regola Budget Alto per budgetViaggio: {}", $pref.getBudgetViaggio());
         activeTemplates.add("benessere");
+        logger.info("Template aggiunto: benessere");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 // Regole per il periodo
@@ -105,12 +143,18 @@ rule "Periodo Estivo"
     when
         $pref : TravelPreference(departureDate matches ".*-0[6-8]-.*")
     then
+        logger.info("Applicata Regola Periodo Estivo per departureDate: {}", $pref.getDepartureDate());
         activeTemplates.add("mare");
+        logger.info("Template aggiunto: mare");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end
 
 rule "Periodo Invernale"
     when
         $pref : TravelPreference(departureDate matches ".*-(0[1-2]|12)-.*")
     then
+        logger.info("Applicata Regola Periodo Invernale per departureDate: {}", $pref.getDepartureDate());
         activeTemplates.add("montagna");
+        logger.info("Template aggiunto: montagna");
+        logger.info("Template attivi totali: {}", activeTemplates);
 end 

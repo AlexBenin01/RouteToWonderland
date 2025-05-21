@@ -19,7 +19,7 @@ const TEMPLATES_LABELS = {
 }
 
 // Manteniamo solo la frase di apertura per intro
-const INTRO_PHRASE = "Ciao! Sono il tuo assistente di viaggio. Raccontami dove vorresti andare, con chi e quando: sono qui per aiutarti a organizzare tutto al meglio!"
+const INTRO_PHRASE = "Che tipo di vacanza sogni? Un’avventura adrenalinica, una fuga rilassante, un viaggio tra sapori o un tuffo nella cultura locale? Raccontami il mood che cerchi!"
 
 function escapeHtml(unsafe) {
   return unsafe

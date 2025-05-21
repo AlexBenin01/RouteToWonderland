@@ -1,18 +1,8 @@
 {
-  "tipo_alloggio": {
-    "type": "enum",
-    "description": "Tipo di alloggio preferito. Seleziona uno o più tipi di alloggio.",
-    "enum": [
+  "tipo_alloggio":[[
       "hotel",
       "resort",
       "campeggio",
-      "B&B",
-      "appartamento",
-      "ostello",
-      "villaggio turistico",
-      "agriturismo",
-      "casa vacanza",
-      "motel"
-    ]
-  }
+      "villaggio turistico"
+    ]]
 }

@@ -1,15 +1,4 @@
 {
-  "corsi_cucina": {
-    "type": "boolean",
-    "description": "true/false se si desidera partecipare a corsi di cucina"
-  },
-  "degustazioni": {
-    "type": "array",
-    "description": "tipi di degustazioni richieste",
-    "items": {
-      "type": "string",
-      "enum":["vini", "formaggi", "olio", "pane", "cioccolato"]
-    },
-    "uniqueItems": true
-  }
+  "corsi_cucina": "boolean",
+  "degustazioni": [["vini", "formaggi", "olio", "pane", "cioccolato"]]
 } 

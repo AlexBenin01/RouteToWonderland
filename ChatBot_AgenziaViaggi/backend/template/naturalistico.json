@@ -1,18 +1,5 @@
 {
-  "attività_naturalistiche": {
-    "type": "array",
-    "items": {
-      "type": "string"
-    },
-    "description": "attività da svolgere",
-    "enum":["birdwatching", "safari", "trekking naturalistico"]
-  },
-  "numero_partecipanti": {
-    "type": "integer",
-    "description": "numero di partecipanti"
-  },
-  "guida_naturalistica": {
-    "type": "boolean",
-    "description": "true/false se si desidera una guida naturalistica"
-  }
+  "attivita": [["birdwatching", "safari", "trekking"]],
+  "guida_naturalistica": "boolean",
+  "lingua_guida": "verbatim-string"
 } 

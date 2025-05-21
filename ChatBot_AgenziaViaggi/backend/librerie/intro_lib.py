@@ -12,19 +12,22 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
+from .template_manager import TemplateManager
 
 
 class IntroTemplate:
-    def __init__(self):
-        self.template_path = "template/intro.json"
-        self.template_data = self._load_template()
+    def __init__(self, template_manager: TemplateManager):
+        self.template_manager = template_manager
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
     
-    def _load_template(self) -> Dict[str, Any]:
-        """Carica il template JSON"""
-        with open(self.template_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+    def set_template(self, template_name: str) -> bool:
+        """Cambia il template attivo"""
+        return self.template_manager.set_active_template(template_name)
+    
+    def get_template_data(self) -> Dict[str, Any]:
+        """Ottiene i dati del template attivo"""
+        return self.template_manager.get_active_template()
     
     def _adjust_past_date(self, date_str: str) -> str:
         """
@@ -58,26 +61,40 @@ class IntroTemplate:
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
+        corrected_data = data.copy()
+        template_data = self.get_template_data()
+        
         try:
-            corrected_data = data.copy()
-
+            # Validazione nazione_destinazione
+            if 'nazione_destinazione' not in data or not data['nazione_destinazione']:
+                return False, "La nazione di destinazione è obbligatoria", corrected_data
+            
+            # Validazione regione_citta_destinazione
+            if 'regione_citta_destinazione' not in data or not data['regione_citta_destinazione']:
+                return False, "La regione/città di destinazione è obbligatoria", corrected_data
+            
             # Validazione numero_partecipanti
             if 'numero_partecipanti' in data:
                 if not isinstance(data['numero_partecipanti'], int):
                     return False, "Il numero di partecipanti deve essere un intero", corrected_data
-                if data['numero_partecipanti'] < 1:
-                    return False, "Il numero di partecipanti deve essere almeno 1", corrected_data
-                if data['numero_partecipanti'] > 100:
-                    return False, "Il numero di partecipanti non può superare 100", corrected_data
-
-            # Validazione data_partenza
+                if data['numero_partecipanti'] <= 0:
+                    return False, "Il numero di partecipanti deve essere maggiore di zero", corrected_data
+            
+            # Validazione tipo_partecipanti
+            if 'tipo_partecipanti' in data:
+                valid_types = template_data.get('tipo_partecipanti', [])
+                if isinstance(data['tipo_partecipanti'], list):
+                    if not all(tipo in valid_types for tipo in data['tipo_partecipanti']):
+                        return False, f"I tipi di partecipanti devono essere tra: {', '.join(valid_types)}", corrected_data
+                else:
+                    if data['tipo_partecipanti'] not in valid_types:
+                        return False, f"Il tipo di partecipanti deve essere tra: {', '.join(valid_types)}", corrected_data
+            
+            # Validazione departure_date
             if 'departure_date' in data:
                 if not isinstance(data['departure_date'], str):
                     return False, "La data di partenza deve essere una stringa", corrected_data
                 try:
-                    # Verifica il formato YYYY-MM-DD
-                    datetime.strptime(data['departure_date'], '%Y-%m-%d')
-                    # Se la data è nel passato, la correggiamo
                     corrected_data['departure_date'] = self._adjust_past_date(data['departure_date'])
                 except ValueError:
                     return False, "La data di partenza deve essere nel formato YYYY-MM-DD", corrected_data
@@ -86,11 +103,19 @@ class IntroTemplate:
             if 'trip_duration' in data:
                 if not isinstance(data['trip_duration'], int):
                     return False, "La durata del viaggio deve essere un intero", corrected_data
-                if data['trip_duration'] < 1:
-                    return False, "La durata del viaggio deve essere di almeno 1 giorno", corrected_data
-                if data['trip_duration'] > 365:
-                    return False, "La durata del viaggio non può superare 365 giorni", corrected_data
-
+                if data['trip_duration'] <= 0:
+                    return False, "La durata del viaggio deve essere maggiore di zero", corrected_data
+            
+            # Validazione mood_vacanza
+            if 'mood_vacanza' in data:
+                valid_moods = template_data.get('mood_vacanza', [[]])[0]
+                if isinstance(data['mood_vacanza'], list):
+                    if not all(mood in valid_moods for mood in data['mood_vacanza']):
+                        return False, f"I mood della vacanza devono essere tra: {', '.join(valid_moods)}", corrected_data
+                else:
+                    if data['mood_vacanza'] not in valid_moods:
+                        return False, f"Il mood della vacanza deve essere tra: {', '.join(valid_moods)}", corrected_data
+            
             # Validazione budget_viaggio
             if 'budget_viaggio' in data:
                 if not isinstance(data['budget_viaggio'], int):
@@ -127,61 +152,56 @@ class IntroTemplate:
                 else:
                     processed_data[key] = data[key]
         
-        # Gestione speciale per mood_vacanza che è sempre una lista
-        if 'mood_vacanza' in data:
-            if isinstance(data['mood_vacanza'], list):
-                processed_data['mood_vacanza'] = [item.strip().lower() if isinstance(item, str) else item for item in data['mood_vacanza']]
-            elif isinstance(data['mood_vacanza'], str):
-                processed_data['mood_vacanza'] = [data['mood_vacanza'].strip().lower()]
-            else:
-                processed_data['mood_vacanza'] = []
+        # Copia gli altri campi
+        for key, value in data.items():
+            if key not in processed_data:
+                processed_data[key] = value
         
-        # Gestione speciale per trip_duration
-        if 'trip_duration' in data:
-            print(f"Elaborazione durata_viaggio. Valore originale: {data['trip_duration']} (tipo: {type(data['trip_duration'])})")
-            try:
-                # Se è una stringa, prova a estrarre il numero
-                if isinstance(data['trip_duration'], str):
-                    print(f"Valore è una stringa: '{data['trip_duration']}'")
-                    # Rimuovi eventuali spazi e caratteri non numerici
-                    numero_str = ''.join(c for c in data['trip_duration'] if c.isdigit())
-                    print(f"Stringa pulita: '{numero_str}'")
-                    if numero_str:
-                        processed_data['trip_duration'] = int(numero_str)
-                        print(f"Numero convertito: {processed_data['trip_duration']}")
-                    else:
-                        print("Nessun numero trovato nella stringa")
-                        processed_data['trip_duration'] = None
-                # Se è già un numero, convertilo in intero
-                elif isinstance(data['trip_duration'], (int, float)):
-                    print(f"Valore è un numero: {data['trip_duration']}")
-                    processed_data['trip_duration'] = int(data['trip_duration'])
-                    print(f"Numero convertito in intero: {processed_data['trip_duration']}")
-                else:
-                    print(f"Tipo non supportato: {type(data['trip_duration'])}")
-                    processed_data['trip_duration'] = None
-            except (ValueError, TypeError) as e:
-                print(f"Errore durante la conversione del numero: {str(e)}")
-                processed_data['trip_duration'] = None
-        
-        # Assicura che gli altri numeri siano interi
-        for key in ['numero_partecipanti', 'budget_viaggio']:
-            if key in data:
-                try:
-                    processed_data[key] = int(data[key]) if data[key] is not None else None
-                except (ValueError, TypeError):
-                    processed_data[key] = None
-        
-        # Normalizza la data
-        if 'departure_date' in data:
-            try:
-                date = datetime.strptime(data['departure_date'], '%Y-%m-%d')
-                processed_data['departure_date'] = date.strftime('%Y-%m-%d')
-            except (ValueError, TypeError):
-                processed_data['departure_date'] = None
-        
-        print(f"Risultato finale per durata_viaggio: {processed_data.get('trip_duration')}")
         return processed_data
+    
+    def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """
+        Verifica e aggiorna tutti i campi del template intro utilizzando le funzioni di verifica esistenti
+        
+        Args:
+            data: Dizionario contenente i dati da verificare
+            
+        Returns:
+            Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
+        """
+        warnings = []
+        errors = []
+        updated_data = data.copy()
+        
+        try:
+            # 1. Verifica destinazione generica
+            is_valid_gen, msg_gen, updated_data = self.verifica_destinazione_generica(updated_data)
+            if not is_valid_gen:
+                errors.append(msg_gen)
+            
+            # 2. Verifica destinazione locale
+            is_valid_loc, msg_loc, updated_data = self.verifica_destinazione_locale(updated_data)
+            if not is_valid_loc:
+                errors.append(msg_loc)
+
+            # 3. Verifica mood vacanza
+            is_valid_mood, msg_mood, updated_data = self.verifica_mood_vacanza(updated_data)
+            if not is_valid_mood:
+                errors.append(msg_mood)
+            
+            # 3. Verifica e normalizza i dati
+            updated_data = self.process_data(updated_data)
+            
+            # 4. Verifica la validità dei dati
+            is_valid, msg, updated_data = self.validate_data(updated_data)
+            if not is_valid:
+                errors.append(msg)
+            
+            return updated_data, warnings, errors
+            
+        except Exception as e:
+            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            return updated_data, warnings, errors
 
     def verifica_destinazione_generica(self, data: Dict[str, Any], model_path: str = None) -> Tuple[bool, str, Dict[str, Any]]:
         """
@@ -378,43 +398,86 @@ class IntroTemplate:
                 cursor.close()
             if 'conn' in locals():
                 print("Chiusura connessione")
-                conn.close()
+                conn.close() 
 
-    def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
+    def verifica_mood_vacanza(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
-        Verifica e aggiorna tutti i campi del template intro utilizzando le funzioni di verifica esistenti
-        
-        Args:
-            data: Dizionario contenente i dati da verificare
-            
-        Returns:
-            Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
+        Verifica il mood della vacanza usando gli embedding.
+        Gestisce sia un singolo mood che una lista di mood.
+        Utilizza la tabella tag per trovare corrispondenze semantiche.
         """
-        warnings = []
-        errors = []
-        updated_data = data.copy()
-        
         try:
-            # 1. Verifica destinazione generica
-            is_valid_gen, msg_gen, updated_data = self.verifica_destinazione_generica(updated_data)
-            if not is_valid_gen:
-                errors.append(msg_gen)
-            
-            # 2. Verifica destinazione locale
-            is_valid_loc, msg_loc, updated_data = self.verifica_destinazione_locale(updated_data)
-            if not is_valid_loc:
-                errors.append(msg_loc)
-            
-            # 3. Verifica e normalizza i dati
-            updated_data = self.process_data(updated_data)
-            
-            # 4. Verifica la validità dei dati
-            is_valid, msg, updated_data = self.validate_data(updated_data)
-            if not is_valid:
-                errors.append(msg)
-            
-            return updated_data, warnings, errors
-            
+            if 'mood_vacanza' not in data or not data['mood_vacanza']:
+                print("Mood della vacanza mancante o vuoto")
+                return True, "Mood della vacanza è opzionale", data
+
+            # Converti in lista se è una stringa singola
+            mood_list = data['mood_vacanza'] if isinstance(data['mood_vacanza'], list) else [data['mood_vacanza']]
+            print(f"Verifica mood della vacanza per: {mood_list}")
+
+            print("Tentativo di connessione al database...")
+            conn = psycopg2.connect(
+                dbname="routeToWonderland",
+                user="postgres",
+                password="admin",
+                host="localhost",
+                port=5432
+            )
+            print("Connessione al database stabilita con successo")
+            cursor = conn.cursor()
+
+            mood_corretti = []
+            for mood in mood_list:
+                try:
+                    print(f"Generazione embedding per mood: '{mood}'")
+                    mood_embedding = self.model.encode(mood)
+                    print(f"Embedding generato con successo, dimensione: {len(mood_embedding)}")
+                    # Converti l'array NumPy in lista
+                    mood_embedding = mood_embedding.tolist()
+
+                    print("Esecuzione query per trovare il tag più simile...")
+                    cursor.execute("""
+                        SELECT nome_tag, embedding_tag <=> %s::vector as distanza
+                        FROM tag
+                        WHERE embedding_tag IS NOT NULL
+                        ORDER BY distanza ASC
+                        LIMIT 1
+                    """, (mood_embedding,))
+                    
+                    risultato_mood = cursor.fetchall()
+                    print(f"Risultato query tag: {risultato_mood}")
+
+                    if risultato_mood:
+                        tag_corretto, distanza = risultato_mood[0]
+                        print(f"Distanza trovata: {distanza}")
+                        if distanza < 0.4:
+                            print(f"Aggiornamento mood da '{mood}' a '{tag_corretto}'")
+                            mood_corretti.append(tag_corretto)
+                        else:
+                            print(f"Mood '{mood}' non ha corrispondenze sufficientemente simili")
+                            mood_corretti.append(mood)
+                    else:
+                        print(f"Nessun risultato trovato per il mood '{mood}'")
+                        mood_corretti.append(mood)
+
+                except Exception as e:
+                    print(f"Errore durante la generazione dell'embedding per '{mood}': {str(e)}")
+                    print(f"Tipo di errore: {type(e)}")
+                    import traceback
+                    print("Stack trace:")
+                    print(traceback.format_exc())
+                    mood_corretti.append(mood)
+
+            # Aggiorna il mood_vacanza con la lista corretta
+            data['mood_vacanza'] = mood_corretti
+            print(f"Mood finali: {mood_corretti}")
+            return True, "Mood della vacanza verificato", data
+
         except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
-            return updated_data, warnings, errors 
+            print(f"Errore durante la verifica del mood della vacanza: {str(e)}")
+            return False, f"Errore durante la verifica del mood della vacanza: {str(e)}", data
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()

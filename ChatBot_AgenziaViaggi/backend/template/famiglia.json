@@ -1,10 +1,4 @@
 {
-    "adulti": {
-        "type": "integer",
-        "description": "numero di adulti"
-    },
-    "bambini": {
-        "type": "integer",
-        "description": "numero di bambini"
-    }
+    "adulti": "integer",
+    "bambini": "integer"
 }

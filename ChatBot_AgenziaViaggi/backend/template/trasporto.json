@@ -1,10 +1,4 @@
 {
-    "tipo_veicolo": {
-        "type": "string",
-        "enum": ["bus", "treno", "aereo"]
-    },
-    "luogo_partenza": {
-        "type": "string",
-        "description": "luogo di partenza del viaggio"
-    }
+  "tipo_veicolo": ["bus", "treno", "aereo"],
+  "luogo_partenza": "verbatim-string"
 }

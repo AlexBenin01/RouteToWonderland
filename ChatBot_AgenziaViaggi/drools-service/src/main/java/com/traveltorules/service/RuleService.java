@@ -7,8 +7,10 @@ import org.kie.api.runtime.KieSession;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
+import java.util.ArrayList;
 
 @Service
 public class RuleService {
@@ -47,11 +49,12 @@ public class RuleService {
         }
 
         KieSession kieSession = kieContainer.newKieSession("ksession-rules");
-        List<String> activeTemplates = new ArrayList<>();
+        Set<String> activeTemplates = new HashSet<>();
         
         try {
             logger.info("Inizio valutazione regole Drools");
             kieSession.setGlobal("activeTemplates", activeTemplates);
+            kieSession.setGlobal("logger", logger);
             kieSession.insert(preference);
             kieSession.fireAllRules();
             logger.info("Valutazione regole completata. Templates attivi: {}", activeTemplates);
@@ -59,7 +62,8 @@ public class RuleService {
             kieSession.dispose();
         }
         
-        return activeTemplates;
+        // Converti il Set in List per mantenere la compatibilità con l'interfaccia esistente
+        return new ArrayList<>(activeTemplates);
     }
 
     private boolean isIntroTemplateComplete(TravelPreference preference) {
