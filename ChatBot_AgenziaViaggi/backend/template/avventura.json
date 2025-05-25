@@ -1,7 +1,7 @@
 {
   "attivita": [["rafting", "arrampicata", "trekking"]],
   "livello_difficoltà": ["principiante", "intermedio", "avanzato"],
-  "attrezzatura_necessaria": "boolean",
+  "guida_menzionata": "boolean",
   "guida_esperta": "boolean",
   "lingua_guida": "verbatim-string"
 } 

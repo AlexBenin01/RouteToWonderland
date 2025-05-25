@@ -149,10 +149,15 @@ class MontagnaTemplate(BaseTemplate):
                     print(f"[ERROR] Validazione attivita fallita: {error_msg}")
                     return False, error_msg, corrected_data
                 print(f"[DEBUG] attivita validata con successo: {corrected_data['attivita']}")
+            
 
-            # Mantieni il valore di attrezzatura se presente
+             # Mantieni il valore di attrezzatura se presente
             if 'attrezzatura' in data:
                 corrected_data['attrezzatura'] = data['attrezzatura']
+                # Se attrezzatura è valorizzata, copia lo stesso valore in attrezzatura_menzionata
+                if data['attrezzatura'] is not None:
+                    corrected_data['attrezzatura_menzionata'] = data['attrezzatura']
+            
             
             print("[DEBUG] Validazione completata con successo")
             print(f"[DEBUG] Dati corretti: {corrected_data}")

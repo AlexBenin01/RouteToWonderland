@@ -30,6 +30,8 @@ try:
     cursor.execute("ALTER TABLE attivita_naturalistiche ADD COLUMN IF NOT EXISTS embedding_attivita VECTOR(768);")
     cursor.execute("ALTER TABLE tipo_trasporto ADD COLUMN IF NOT EXISTS embedding_veicolo VECTOR(768);")
     cursor.execute("ALTER TABLE tipo_alloggi ADD COLUMN IF NOT EXISTS embedding_tipo_alloggi VECTOR(768);")
+    cursor.execute("ALTER TABLE tipo_cambio ADD COLUMN IF NOT EXISTS embedding_tipo_cambio VECTOR(768);")
+    cursor.execute("ALTER TABLE linguaggio ADD COLUMN IF NOT EXISTS embedding_lingua VECTOR(768);")
     conn.commit()
 
     # 1. Recupera valori unici
@@ -77,6 +79,12 @@ try:
 
     cursor.execute("SELECT DISTINCT alloggi FROM tipo_alloggi WHERE alloggi IS NOT NULL;")
     alloggi = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute("SELECT DISTINCT cambio FROM tipo_cambio WHERE cambio IS NOT NULL;")
+    cambio = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute("SELECT DISTINCT lingua FROM linguaggio WHERE lingua IS NOT NULL;")
+    lingue = [row[0] for row in cursor.fetchall()]
 
     # 2. Embedding con Nomic
     def genera_embedding(lista_valori):
@@ -137,6 +145,15 @@ try:
     emb_tipo_trasporto = genera_embedding(veicoli)
     print("Generazione embedding per tipo_alloggi...")
     emb_tipo_alloggi = genera_embedding(alloggi)
+
+    print("Generazione embedding per tipo_cambio...")
+    emb_tipo_cambio = genera_embedding(cambio)
+
+    print("Generazione embedding per lingue...")
+    emb_lingue = genera_embedding(lingue)
+
+
+
 
 
     # 3. Salva nel DB
@@ -246,7 +263,19 @@ try:
             WHERE alloggi = %s
         """, (emb, veicolo))
     
+    for cambio, emb in zip(cambio, emb_tipo_cambio):
+        cursor.execute("""
+            UPDATE tipo_cambio
+            SET embedding_tipo_cambio = %s
+            WHERE cambio = %s
+        """, (emb, cambio))
 
+    for lingua, emb in zip(lingue, emb_lingue):
+        cursor.execute("""
+            UPDATE linguaggio
+            SET embedding_lingua = %s
+            WHERE lingua = %s
+        """, (emb, lingua))
     
 
     # Commit e chiusura

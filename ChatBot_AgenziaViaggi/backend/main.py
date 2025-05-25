@@ -21,6 +21,7 @@ from librerie.mare_lib import MareTemplate
 from librerie.gastronomia_lib import GastronomiaTemplate
 from librerie.citta_arte_lib import CittaArteTemplate
 from librerie.benessere_lib import BenessereTemplate
+from librerie.famiglia_lib import FamigliaTemplate
 from services.drools_service import DroolsService
 import logging
 from librerie.template_manager import TemplateManager
@@ -73,9 +74,10 @@ templates = {
     "mare": MareTemplate(template_manager),
     "gastronomia": GastronomiaTemplate(template_manager),
     "citta_arte": CittaArteTemplate(template_manager),
-    "benessere": BenessereTemplate(template_manager)
+    "benessere": BenessereTemplate(template_manager),
+    "famiglia": FamigliaTemplate(template_manager)
 }
-
+# Inizializzazione del servizio Drools
 drools_service = DroolsService()
 
 class SimpleRequest(BaseModel):

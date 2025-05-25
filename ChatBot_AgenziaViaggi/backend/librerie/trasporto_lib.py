@@ -51,7 +51,8 @@ class TrasportoTemplate(BaseTemplate):
         try:
             if 'luogo_partenza' not in data or not data['luogo_partenza']:
                 print("Luogo di partenza mancante o vuoto")
-                return False, "Il luogo di partenza è obbligatorio", data
+                data['luogo_partenza'] = None
+                return True, "Luogo di partenza mancante", data
 
             print(f"Verifica luogo di partenza: {data['luogo_partenza']}")
             
@@ -78,7 +79,8 @@ class TrasportoTemplate(BaseTemplate):
                 import traceback
                 print("Stack trace:")
                 print(traceback.format_exc())
-                raise
+                data['luogo_partenza'] = None
+                return True, "Errore nella generazione dell'embedding", data
 
             print("Esecuzione query per trovare il luogo più simile...")
             cursor.execute("""
@@ -98,7 +100,7 @@ class TrasportoTemplate(BaseTemplate):
                 if distanza > 0.4:
                     print(f"Distanza troppo grande ({distanza} > 0.4), rimuovo il valore")
                     data['luogo_partenza'] = None
-                    return False, "Nessun luogo simile trovato nel database", data
+                    return True, "Nessun luogo simile trovato nel database", data
                 
                 print(f"Aggiornamento luogo da '{data['luogo_partenza']}' a '{luogo_corretto}'")
                 data['luogo_partenza'] = luogo_corretto
@@ -106,14 +108,15 @@ class TrasportoTemplate(BaseTemplate):
             else:
                 print("Nessun risultato trovato nel database, rimuovo il valore")
                 data['luogo_partenza'] = None
-                return False, "Nessun luogo trovato nel database", data
+                return True, "Nessun luogo trovato nel database", data
 
         except Exception as e:
             print(f"Errore durante la verifica del luogo: {str(e)}")
             import traceback
             print("Stack trace:")
             print(traceback.format_exc())
-            return False, f"Errore durante la verifica del luogo: {str(e)}", data
+            data['luogo_partenza'] = None
+            return True, f"Errore durante la verifica del luogo: {str(e)}", data
         finally:
             if 'cursor' in locals():
                 print("Chiusura cursor")
@@ -136,7 +139,8 @@ class TrasportoTemplate(BaseTemplate):
         try:
             if 'tipo_veicolo' not in data or not data['tipo_veicolo']:
                 print("Tipo di veicolo mancante o vuoto")
-                return False, "Il tipo di veicolo è obbligatorio", data
+                data['tipo_veicolo'] = None
+                return True, "Tipo di veicolo mancante", data
 
             print(f"Verifica tipo di veicolo: {data['tipo_veicolo']}")
             
@@ -163,7 +167,8 @@ class TrasportoTemplate(BaseTemplate):
                 import traceback
                 print("Stack trace:")
                 print(traceback.format_exc())
-                raise
+                data['tipo_veicolo'] = None
+                return True, "Errore nella generazione dell'embedding", data
 
             print("Esecuzione query per trovare il tipo di veicolo più simile...")
             cursor.execute("""
@@ -183,7 +188,7 @@ class TrasportoTemplate(BaseTemplate):
                 if distanza > 0.4:
                     print(f"Distanza troppo grande ({distanza} > 0.4), rimuovo il valore")
                     data['tipo_veicolo'] = None
-                    return False, "Nessun tipo di veicolo simile trovato nel database", data
+                    return True, "Nessun tipo di veicolo simile trovato nel database", data
                 
                 print(f"Aggiornamento tipo di veicolo da '{data['tipo_veicolo']}' a '{tipo_veicolo_corretto}'")
                 data['tipo_veicolo'] = tipo_veicolo_corretto
@@ -191,14 +196,15 @@ class TrasportoTemplate(BaseTemplate):
             else:
                 print("Nessun risultato trovato nel database, rimuovo il valore")
                 data['tipo_veicolo'] = None
-                return False, "Nessun tipo di veicolo trovato nel database", data
+                return True, "Nessun tipo di veicolo trovato nel database", data
 
         except Exception as e:
             print(f"Errore durante la verifica del tipo di veicolo: {str(e)}")
             import traceback
             print("Stack trace:")
             print(traceback.format_exc())
-            return False, f"Errore durante la verifica del tipo di veicolo: {str(e)}", data
+            data['tipo_veicolo'] = None
+            return True, f"Errore durante la verifica del tipo di veicolo: {str(e)}", data
         finally:
             if 'cursor' in locals():
                 print("Chiusura cursor")
@@ -226,23 +232,15 @@ class TrasportoTemplate(BaseTemplate):
             if 'tipo_veicolo' in data:
                 print(f"[DEBUG] Validazione tipo_veicolo: {data['tipo_veicolo']}")
                 is_valid, msg, updated_data = self.verifica_tipo_veicolo(data)
-                if not is_valid:
-                    print(f"[ERROR] {msg}")
-                    corrected_data['tipo_veicolo'] = ""
-                    return False, msg, corrected_data
                 corrected_data.update(updated_data)
-                print(f"[DEBUG] tipo_veicolo valido: {corrected_data['tipo_veicolo']}")
+                print(f"[DEBUG] tipo_veicolo validato: {corrected_data.get('tipo_veicolo')}")
 
             # Validazione luogo_partenza usando verifica_luogo
             if 'luogo_partenza' in data:
                 print(f"[DEBUG] Validazione luogo_partenza: {data['luogo_partenza']}")
                 is_valid, msg, updated_data = self.verifica_luogo(data)
-                if not is_valid:
-                    print(f"[ERROR] {msg}")
-                    corrected_data['luogo_partenza'] = ""
-                    return False, msg, corrected_data
                 corrected_data.update(updated_data)
-                print(f"[DEBUG] luogo_partenza valido: {corrected_data['luogo_partenza']}")
+                print(f"[DEBUG] luogo_partenza validato: {corrected_data.get('luogo_partenza')}")
             
             print("[DEBUG] Validazione completata con successo")
             print(f"[DEBUG] Dati corretti: {corrected_data}")

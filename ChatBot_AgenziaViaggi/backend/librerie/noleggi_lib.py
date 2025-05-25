@@ -17,13 +17,93 @@ from .base_template import BaseTemplate
 class NoleggiTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
         super().__init__(template_manager)
-        self.template_path = "template/noleggi.json"
-        self.template_data = self._load_template()
+        self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
+        self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
+
     
     def _load_template(self) -> Dict[str, Any]:
         """Carica il template JSON"""
         with open(self.template_path, 'r', encoding='utf-8') as f:
             return json.load(f)
+        
+
+    def validate_tipo_cambio(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Valida il tipo di cambio
+        
+        Args:
+            data: Dizionario contenente i dati da validare
+            
+        Returns:
+            Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
+        """
+        corrected_data = {}
+        
+        try:
+            if 'tipo_cambio' not in data or not data['tipo_cambio']:
+                return True, "Il tipo di cambio mancante", corrected_data
+
+            print(f"Verifica tipo di cambio per: {data['tipo_cambio']}")
+
+            print("Tentativo di connessione al database...")
+            conn = psycopg2.connect(
+                dbname="routeToWonderland",
+                user="postgres",
+                password="admin",
+                host="localhost",
+                port=5432
+            )
+            print("Connessione al database stabilita con successo")
+            cursor = conn.cursor()
+
+            try:
+                print(f"Generazione embedding per tipo di cambio: '{data['tipo_cambio']}'")
+                tipo_cambio_embedding = self.model.encode(data['tipo_cambio'])
+                print(f"Embedding generato con successo, dimensione: {len(tipo_cambio_embedding)}")
+                tipo_cambio_embedding = tipo_cambio_embedding.tolist()
+
+                print("Esecuzione query per trovare il tipo di cambio più simile...")
+                cursor.execute("""
+                    SELECT cambio, embedding_tipo_cambio <=> %s::vector as distanza
+                    FROM tipo_cambio
+                    WHERE embedding_tipo_cambio IS NOT NULL
+                    ORDER BY distanza ASC
+                    LIMIT 1
+                """, (tipo_cambio_embedding,))
+                
+                risultato = cursor.fetchall()
+                print(f"Risultato query: {risultato}")
+
+                if risultato:
+                    tipo_cambio_corretto, distanza = risultato[0]
+                    print(f"Distanza trovata: {distanza}")
+                    if distanza < 0.4:
+                        print(f"Aggiornamento tipo di cambio da '{data['tipo_cambio']}' a '{tipo_cambio_corretto}'")
+                        corrected_data['tipo_cambio'] = tipo_cambio_corretto
+                        return True, "Tipo di cambio verificato", corrected_data
+                    else:
+                        print(f"Tipo di cambio '{data['tipo_cambio']}' non ha corrispondenze sufficientemente simili")
+                        return False, "Tipo di cambio non valido", corrected_data
+                else:
+                    print(f"Nessun risultato trovato per il tipo di cambio '{data['tipo_cambio']}'")
+                    return False, "Tipo di cambio non valido", corrected_data
+
+            except Exception as e:
+                print(f"Errore durante la generazione dell'embedding: {str(e)}")
+                print(f"Tipo di errore: {type(e)}")
+                import traceback
+                print("Stack trace:")
+                print(traceback.format_exc())
+                return False, f"Errore durante la verifica del cambio auto: {str(e)}", corrected_data
+
+        except Exception as e:
+            print(f"Errore durante la verifica del cambio auto: {str(e)}")
+            return False, f"Errore durante la verifica del cambio auto: {str(e)}", corrected_data
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
     
     def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
@@ -56,14 +136,17 @@ class NoleggiTemplate(BaseTemplate):
                     return False, "Il numero di posti auto deve essere compreso tra 2 e 12", corrected_data
                 print(f"[DEBUG] posti_auto valido: {data['posti_auto']}")
 
+            
+
             # Validazione cambio_automatico
-            if 'cambio_automatico' in data:
-                print(f"[DEBUG] Validazione cambio_automatico: {data['cambio_automatico']}")
-                if not isinstance(data['cambio_automatico'], bool):
-                    print("[ERROR] cambio_automatico non è un booleano")
-                    corrected_data['cambio_automatico'] = None
-                    return False, "Il campo cambio automatico deve essere un booleano", corrected_data
-                print(f"[DEBUG] cambio_automatico valido: {data['cambio_automatico']}")
+            if 'tipo_cambio' in data:
+                print(f"[DEBUG] Validazione tipo_cambio: {data['tipo_cambio']}")
+                is_valid, error_msg, updated_data = self.validate_tipo_cambio(corrected_data)
+                if not is_valid:
+                    print(f"[ERROR] Validazione tipo_cambio fallita: {error_msg}")
+                    return False, error_msg, corrected_data
+                corrected_data.update(updated_data)
+                print(f"[DEBUG] tipo_cambio validato con successo: {corrected_data['tipo_cambio']}")
             
             print("[DEBUG] Validazione completata con successo")
             print(f"[DEBUG] Dati corretti: {corrected_data}")

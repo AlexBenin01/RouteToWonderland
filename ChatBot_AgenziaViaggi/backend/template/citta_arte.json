@@ -1,5 +1,6 @@
 {
   "attivita": [["museo", "galleria", "tour"]],
-  "richiesta_guida_turistica": ["si", "no"],
+  "guida_menzionata": "boolean",
+  "guida_turistica": "boolean",
   "lingua_guida": "verbatim-string"
 }

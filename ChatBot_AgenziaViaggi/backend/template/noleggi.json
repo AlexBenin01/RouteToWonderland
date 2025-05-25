@@ -1,4 +1,4 @@
 {
   "posti_auto": "integer",
-  "cambio_automatico": "boolean"
+  "tipo_cambio": "verbatim-string"
 }

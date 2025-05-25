@@ -12,7 +12,7 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from stdnum.it import codicefiscale
-from stdnum.it import vat
+from stdnum import vatin
 from stdnum.exceptions import ValidationError
 from pathlib import Path
 
@@ -92,10 +92,10 @@ class ContattiTemplate(BaseTemplate):
         try:
             print(f"[DEBUG] Verifica partita IVA: {piva}")
             # Rimuovi spazi
-            piva = vat.compact(piva)
+            piva = vatin.compact(piva)
             print(f"[DEBUG] Partita IVA normalizzata: {piva}")
             # Verifica partita IVA
-            result = vat.is_valid(piva)
+            result = vatin.is_valid(piva)
             print(f"[DEBUG] Risultato verifica partita IVA: {result}")
             return result
         except Exception as e:
@@ -146,7 +146,7 @@ class ContattiTemplate(BaseTemplate):
                     corrected_data['codice_fiscale_o_partita_iva'] = value
                 elif self.is_valid_partita_iva(value):
                     print("[DEBUG] Validato come partita IVA")
-                    corrected_data['codice_fiscale_o_partita_iva'] = vat.compact(value)
+                    corrected_data['codice_fiscale_o_partita_iva'] = vatin.compact(value)
                 else:
                     print("[ERROR] Valore non valido come codice fiscale o partita IVA")
                     corrected_data['codice_fiscale_o_partita_iva'] = ""

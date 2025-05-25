@@ -119,6 +119,89 @@ class CittaArteTemplate(BaseTemplate):
             if 'conn' in locals():
                 conn.close()
 
+
+    def validate_lingua(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Valida lingua_guida
+        
+        Args:
+            data: Dizionario contenente i dati da validare
+            
+        Returns:
+            Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
+        """
+        corrected_data = {}
+        
+        try:
+            if 'lingua_guida' not in data or not data['lingua_guida']:
+                return True, "La lingua guida mancante", corrected_data
+
+            print(f"Verifica lingua guida per: {data['lingua_guida']}")
+
+            print("Tentativo di connessione al database...")
+            conn = psycopg2.connect(
+                dbname="routeToWonderland",
+                user="postgres",
+                password="admin",
+                host="localhost",
+                port=5432
+            )
+            print("Connessione al database stabilita con successo")
+            cursor = conn.cursor()
+
+            try:
+                print(f"Generazione embedding per lingua guida: '{data['lingua_guida']}'")
+                lingua_guida_embedding = self.model.encode(data['lingua_guida'])
+                print(f"Embedding generato con successo, dimensione: {len(lingua_guida_embedding)}")
+                lingua_guida_embedding = lingua_guida_embedding.tolist()
+
+                print("Esecuzione query per trovare la lingua guida più simile...")
+                cursor.execute("""
+                    SELECT lingua, embedding_lingua <=> %s::vector as distanza
+                    FROM linguaggio
+                    WHERE embedding_lingua IS NOT NULL
+                    ORDER BY distanza ASC
+                    LIMIT 1
+                """, (lingua_guida_embedding,))
+                
+                risultato = cursor.fetchall()
+                print(f"Risultato query: {risultato}")
+
+                if risultato:
+                    lingua_corretta, distanza = risultato[0]
+                    print(f"Distanza trovata: {distanza}")
+                    if distanza < 0.4:
+                        print(f"Aggiornamento lingua guida da '{data['lingua_guida']}' a '{lingua_corretta}'")
+                        corrected_data['lingua_guida'] = lingua_corretta
+                        return True, "Lingua guida verificata", corrected_data
+                    else:
+                        print(f"Lingua guida '{data['lingua_guida']}' non ha corrispondenze sufficientemente simili")
+                        corrected_data['lingua_guida'] = None
+                        return True, "Lingua guida non valida", corrected_data
+                else:
+                    print(f"Nessun risultato trovato per la lingua guida '{data['lingua_guida']}'")
+                    corrected_data['lingua_guida'] = None
+                    return True, "Lingua guida non valida", corrected_data
+
+            except Exception as e:
+                print(f"Errore durante la generazione dell'embedding: {str(e)}")
+                print(f"Tipo di errore: {type(e)}")
+                import traceback
+                print("Stack trace:")
+                print(traceback.format_exc())
+                corrected_data['lingua_guida'] = None
+                return True, f"Errore durante la verifica della lingua guida: {str(e)}", corrected_data
+
+        except Exception as e:
+            print(f"Errore durante la verifica della lingua guida: {str(e)}")
+            corrected_data['lingua_guida'] = None
+            return True, f"Errore durante la verifica della lingua guida: {str(e)}", corrected_data
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
+
     def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Valida i dati in input secondo il template
@@ -146,23 +229,38 @@ class CittaArteTemplate(BaseTemplate):
                 corrected_data.update(updated_data)
                 print(f"[DEBUG] Attività valide: {corrected_data['attivita']}")
 
+
+            #se guida_menzionata è null, allora non è presente guida_turistica
+            if data['guida_menzionata'] is None:
+                print("[DEBUG] guida_menzionata è null, allora non è presente guida_turistica")
+                corrected_data['guida_turistica'] = None
+            if data.get('guida_menzionata') is True:
+                print("[DEBUG] guida_menzionata è true, allora è presente guida_turistica")
+                corrected_data['guida_turistica'] = True
+            if data.get('guida_menzionata') is False:
+                print("[DEBUG] guida_menzionata è false, allora non è presente guida_turistica")
+                corrected_data['guida_turistica'] = False
+
+
             # Gestione guida turistica e lingua
-            if 'richiesta_guida_turistica' in data:
-                print(f"[DEBUG] Verifica richiesta_guida_turistica: {data['richiesta_guida_turistica']}")
-                if data['richiesta_guida_turistica'].lower() == "no":
-                    print("[DEBUG] Richiesta guida turistica impostata a no")
+            if 'guida_turistica' in data:
+                print(f"[DEBUG] Verifica guida_turistica: {data['guida_turistica']}")
+                if data['guida_turistica'] is False:  # Verifica esplicita per False
+                    print("[DEBUG] Richiesta guida turistica impostata a False")
                     corrected_data['lingua_guida'] = "no guida"
                     print(f"[DEBUG] Lingua guida impostata a: {corrected_data['lingua_guida']}")
-                elif data['richiesta_guida_turistica'].lower() == "si":
+                elif data['guida_turistica'] is True:  # Verifica esplicita per True
                     if 'lingua_guida' not in data or not data['lingua_guida']:
                         print("[ERROR] Lingua guida mancante o non specificata")
                         return False, "La lingua della guida è obbligatoria quando è richiesta una guida turistica", corrected_data
-                else:
-                    print("[ERROR] Valore non valido per richiesta_guida_turistica")
-                    return False, "Il campo richiesta_guida_turistica deve essere 'si' o 'no'", corrected_data
+                    else:
+                        print("[DEBUG] Validazione lingua guida")
+                        is_valid, error_msg, updated_data = self.validate_lingua(corrected_data)
+                        corrected_data.update(updated_data)
+                        print(f"[DEBUG] Lingua guida validata: {corrected_data.get('lingua_guida')}")
             else:
-                print("[ERROR] Campo richiesta_guida_turistica mancante")
-                return False, "Il campo richiesta_guida_turistica è obbligatorio", corrected_data
+                print("[ERROR] Campo guida_turistica mancante")
+                return False, "Il campo guida_turistica è obbligatorio", corrected_data
 
             
             print("[DEBUG] Validazione completata con successo")

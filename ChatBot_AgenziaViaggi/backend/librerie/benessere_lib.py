@@ -134,33 +134,14 @@ class BenessereTemplate(BaseTemplate):
         template_data = self.get_template_data()
         
         try:
-            # Validazione tipo_attivita
-            if 'tipo_attivita' in data:
-                print(f"[DEBUG] Validazione tipo_attivita: {data['tipo_attivita']}")
-                valid_types = template_data.get('tipo_attivita', [])
-                print(f"[DEBUG] Tipi validi: {valid_types}")
-                if data['tipo_attivita'] not in valid_types:
-                    print(f"[ERROR] tipo_attivita non valido: {data['tipo_attivita']}")
-                    corrected_data['tipo_attivita'] = ""
-                    return False, f"Il tipo di attività deve essere tra: {', '.join(valid_types)}", corrected_data
-                print(f"[DEBUG] tipo_attivita valido: {data['tipo_attivita']}")
+            # Validazione trattamenti
+            if 'trattamenti' in data:
+                print(f"[DEBUG] Validazione trattamenti: {data['trattamenti']}")
+                is_valid, error_msg, updated_data = self.validate_trattamenti(corrected_data)
+                corrected_data.update(updated_data)
+                print(f"[DEBUG] trattamenti validata: {corrected_data.get('trattamenti')}")
 
-            # Validazione preferenze_attivita
-            if 'preferenze_attivita' in data:
-                print(f"[DEBUG] Validazione preferenze_attivita: {data['preferenze_attivita']}")
-                valid_prefs = template_data.get('preferenze_attivita', [])
-                print(f"[DEBUG] Preferenze valide: {valid_prefs}")
-                if isinstance(data['preferenze_attivita'], list):
-                    if not all(pref in valid_prefs for pref in data['preferenze_attivita']):
-                        print(f"[ERROR] preferenze_attivita non valide: {data['preferenze_attivita']}")
-                        corrected_data['preferenze_attivita'] = []
-                        return False, f"Le preferenze di attività devono essere tra: {', '.join(valid_prefs)}", corrected_data
-                else:
-                    if data['preferenze_attivita'] not in valid_prefs:
-                        print(f"[ERROR] preferenze_attivita non valida: {data['preferenze_attivita']}")
-                        corrected_data['preferenze_attivita'] = []
-                        return False, f"La preferenza di attività deve essere tra: {', '.join(valid_prefs)}", corrected_data
-                print(f"[DEBUG] preferenze_attivita valide: {data['preferenze_attivita']}")
+            
             
             print("[DEBUG] Validazione completata con successo")
             print(f"[DEBUG] Dati corretti: {corrected_data}")

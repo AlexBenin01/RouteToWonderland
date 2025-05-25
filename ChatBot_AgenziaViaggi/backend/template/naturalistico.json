@@ -1,5 +1,6 @@
 {
   "attivita": [["birdwatching", "safari", "trekking"]],
-  "guida_naturalistica": "boolean",
+  "guida_menzionata": "boolean",
+  "guida_esperta": "boolean",
   "lingua_guida": "verbatim-string"
 } 

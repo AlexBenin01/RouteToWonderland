@@ -40,7 +40,7 @@ class MareTemplate(BaseTemplate):
         self.template_path = f"template/{template_name}.json"
         self.template_data = self._load_template()
 
-    def validate_attivita_mare(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
+    def validate_attivita(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Valida le attività marine usando l'embedding per trovare corrispondenze nel database
         
@@ -143,21 +143,22 @@ class MareTemplate(BaseTemplate):
         try:
             # Validazione attivita usando validate_attivita
             if 'attivita' in data:
-                print(f"[DEBUG] Validazione tipo_attivita: {data['tipo_attivita']}")
-                is_valid, error_msg, corrected_data = self.validate_attivita(corrected_data)
+                print(f"[DEBUG] Validazione attivita: {data['attivita']}")
+                is_valid, error_msg, updated_data = self.validate_attivita(corrected_data)
                 if not is_valid:
-                    print(f"[ERROR] Validazione tipo_attivita fallita: {error_msg}")
+                    print(f"[ERROR] Validazione attivita fallita: {error_msg}")
                     return False, error_msg, corrected_data
-                print(f"[DEBUG] tipo_attivita validato con successo: {corrected_data['tipo_attivita']}")
+                corrected_data.update(updated_data)
+                print(f"[DEBUG] attivita validato con successo: {corrected_data['attivita']}")
 
-            # Validazione attrezzatura
+            # Mantieni il valore di attrezzatura se presente
             if 'attrezzatura' in data:
-                print(f"[DEBUG] Verifica attrezzatura: {data['attrezzatura']}")
-                if data['attrezzatura'] is None:
-                    print(f"[ERROR] attrezzatura non inizializzato")
-                    return False, "Il campo attrezzatura deve essere inizializzato", corrected_data
-                print(f"[DEBUG] attrezzatura inizializzato: {data['attrezzatura']}")
+                corrected_data['attrezzatura'] = data['attrezzatura']
+                # Se attrezzatura è valorizzata, copia lo stesso valore in attrezzatura_menzionata
+                corrected_data['attrezzatura_menzionata'] = data['attrezzatura']
             
+                
+
             print("[DEBUG] Validazione completata con successo")
             print(f"[DEBUG] Dati corretti: {corrected_data}")
             return True, "Dati validi", corrected_data
@@ -166,35 +167,11 @@ class MareTemplate(BaseTemplate):
             print(f"[ERROR] Errore durante la validazione: {str(e)}")
             return False, f"Errore durante la validazione: {str(e)}", corrected_data
     
-    def process_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Elabora i dati secondo le regole del template
-        
-        Args:
-            data: Dizionario contenente i dati da elaborare
-            
-        Returns:
-            Dict[str, Any]: Dati elaborati
-        """
-        corrected_data = {}
-        
-        try:
-            # Mantieni i booleani come sono
-            if 'attrezzatura' in data:
-                corrected_data['attrezzatura'] = data['attrezzatura']
 
 
-                # Validazione attività
-                if 'attivita' in data:
-                    is_valid, msg, attivita_data = self.validate_attivita_mare(data)
-                    if not is_valid:
-                        return False, msg, corrected_data
-                    corrected_data.update(attivita_data)
-            
-                return True, "Dati validi", corrected_data
-                
-        except Exception as e:
-            return False, f"Errore durante la validazione: {str(e)}", corrected_data
+        
+        
+    
 
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """

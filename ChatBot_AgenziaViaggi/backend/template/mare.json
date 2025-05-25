@@ -1,5 +1,6 @@
 {
   "attivita": [["snorkeling", "windsurf", "subacquea"]],
+  "attrezzatura_menzionata": "boolean",
   "attrezzatura": "boolean"
 
 }   

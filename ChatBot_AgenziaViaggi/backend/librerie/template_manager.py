@@ -30,7 +30,8 @@ class TemplateManager:
             "mare": "mare.json",
             "gastronomia": "gastronomia.json",
             "citta_arte": "citta_arte.json",
-            "benessere": "benessere.json"
+            "benessere": "benessere.json",
+            "famiglia": "famiglia.json",
         }
         
         for template_name, file_name in template_files.items():

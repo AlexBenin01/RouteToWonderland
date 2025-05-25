@@ -1,4 +1,5 @@
 {  
   "attivita": [["sci", "snowboard", "ciaspolate", "escursioni", "visita rifugi"]],
+  "attrezzatura_menzionata": "boolean",
   "attrezzatura": "boolean"
 } 
