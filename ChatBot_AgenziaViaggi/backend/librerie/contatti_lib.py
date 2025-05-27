@@ -15,7 +15,8 @@ from stdnum.it import codicefiscale
 from stdnum import vatin
 from stdnum.exceptions import ValidationError
 from pathlib import Path
-
+import phonenumbers
+from phonenumbers import geocoder
 import logging
 
 # Configurazione del logging
@@ -112,8 +113,10 @@ class ContattiTemplate(BaseTemplate):
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        print("[DEBUG] Inizio validazione dati")
+        print("[DEBUG] Inizio validazione dati contatti")
         print(f"[DEBUG] Dati ricevuti: {data}")
+        
+        # Crea una copia dei dati originali per il confronto
         corrected_data = data.copy()
         template_data = self.get_template_data()
         
@@ -160,16 +163,43 @@ class ContattiTemplate(BaseTemplate):
                     corrected_data['numero_cellulare'] = ""
                     return False, "Il numero di cellulare deve essere una stringa", corrected_data
                 
-                # Rimuovi spazi e caratteri non numerici
-                phone = re.sub(r'[^\d]', '', data['numero_cellulare'])
-                print(f"[DEBUG] Numero cellulare normalizzato: {phone}")
-                
-                if not self.is_valid_phone_number(phone):
-                    print("[ERROR] Formato numero cellulare non valido")
+                try:
+                    # Aggiungi il prefisso + se non presente
+                    phone_number = data['numero_cellulare']
+                    if not phone_number.startswith('+'):
+                        phone_number = '+' + phone_number
+                    
+                    # Parsa il numero
+                    parsed_number = phonenumbers.parse(phone_number)
+                    print(f"[DEBUG] Numero cellulare parsato: {parsed_number}")
+                    
+                    # Verifica se il numero è valido
+                    if not phonenumbers.is_valid_number(parsed_number):
+                        print("[ERROR] Numero cellulare non valido")
+                        corrected_data['numero_cellulare'] = ""
+                        return False, "Il numero di cellulare non è valido", corrected_data
+                    
+                    # Ottieni il nome del paese
+                    country_name = phonenumbers.geocoder.description_for_number(parsed_number, "it")
+                    print(f"[DEBUG] Paese rilevato: {country_name}")
+                    
+                    # Formatta il numero nel formato internazionale
+                    formatted_number = phonenumbers.format_number(
+                        parsed_number, 
+                        phonenumbers.PhoneNumberFormat.INTERNATIONAL
+                    )
+                    
+                    # Aggiungi il nome del paese, se non disponibile usa "Italia" come default
+                    if not country_name:
+                        country_name = "Italia"
+                        print("[DEBUG] Nessun paese rilevato, uso Italia come default")
+                    
+                    corrected_data['numero_cellulare'] = f"{formatted_number} ({country_name})"
+                    print(f"[DEBUG] Numero cellulare corretto: {corrected_data['numero_cellulare']}")
+                except phonenumbers.NumberParseException as e:
+                    print(f"[ERROR] Errore nel parsing del numero: {str(e)}")
                     corrected_data['numero_cellulare'] = ""
-                    return False, "Formato numero di cellulare non valido", corrected_data
-                corrected_data['numero_cellulare'] = phone
-                print(f"[DEBUG] Numero cellulare corretto: {corrected_data['numero_cellulare']}")
+                    return False, "Il numero di cellulare non è valido", corrected_data
 
             # Validazione email
             if 'email' in data:
@@ -210,23 +240,34 @@ class ContattiTemplate(BaseTemplate):
         print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
+        original_data = data.copy()
         updated_data = data.copy()
-        
         try:
-            # Chiama il metodo della classe base per la validazione standard
-            print("[DEBUG] Chiamata verifica_template della classe base")
+            
+            # 4. Chiama il metodo della classe base per la validazione standard
             updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
             warnings.extend(base_warnings)
             errors.extend(base_errors)
-            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
-            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
+
+            data_was_different = self.are_data_different(original_data, updated_data)
+            #verifica se è completo
+            template_completo = all(
+                campo in updated_data and (
+                    updated_data[campo] is not None and 
+                    (isinstance(updated_data[campo], bool) or updated_data[campo])
+                )
+                for campo in self.get_template_data().keys()
+            )
+            print(f"[DEBUG] Template completo: {template_completo}")
             
-            print("[DEBUG] Verifica template completata")
-            print(f"[DEBUG] Dati aggiornati: {updated_data}")
-            return updated_data, warnings, errors
+            # Se il template è completo, imposta data_was_different a True
+            if template_completo:
+                data_was_different = True
+                print("[DEBUG] Template completo, data_was_different impostato a True")
+            
+            return updated_data, data_was_different, warnings, errors
             
         except Exception as e:
-            error_msg = f"Errore durante la verifica del template: {str(e)}"
-            print(f"[ERROR] {error_msg}")
-            errors.append(error_msg)
-            return updated_data, warnings, errors 
+            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            data_was_different = self.are_data_different(original_data, updated_data)
+            return updated_data, data_was_different, warnings, errors

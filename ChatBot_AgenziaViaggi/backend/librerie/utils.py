@@ -268,10 +268,10 @@ def nuextract_generate(model, tokenizer, prompts, generation_config, pixel_value
 # =====================
 # UTILITY GENERALI
 # =====================
-def extract_entities(text, template, model_path='./NuExtract-2-2B-experimental', current_data=None):
+def extract_entities(text, template, model_path='./NuExtract-2-2B-experimental'):
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
-    msg = construct_message(text, template, current_data)
+    msg = construct_message(text, template)
     input_messages = [msg]
     input_content = prepare_inputs(
         messages=input_messages,

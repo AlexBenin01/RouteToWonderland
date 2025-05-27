@@ -1,0 +1,22 @@
+{   
+    "anziani": "integer",
+    "tipo_alloggio":[["hotel","resort","campeggio","villaggio turistico"]],
+    "attivita_avventura": [["rafting", "arrampicata", "trekking"]],
+    "adulti": "integer",
+    "trattamenti": [["massaggi", "fango", "idromassaggio"]],
+    "attivita_citta_arte": [["museo", "galleria", "tour"]],
+    "genitori": "integer",
+    "full_name": "verbatim-string",
+    "codice_fiscale_o_partita_iva": "verbatim-string",
+    "numero_cellulare": "verbatim-string",
+    "email": "verbatim-string",
+    "bambini": "integer",
+    "degustazioni": [["vini", "formaggi", "olio", "pane", "cioccolato"]],
+    "attivita_mare": [["snorkeling", "windsurf", "subacquea"]],
+    "attivita_montagna": [["sci", "snowboard", "ciaspolate", "escursioni", "visita rifugi"]],
+    "attivita_naturalistico": [["birdwatching", "safari", "trekking"]],
+    "posti_auto": "integer",
+    "tipo_cambio": "verbatim-string",
+    "tipo_veicolo": ["bus", "treno", "aereo"],
+    "luogo_partenza": "verbatim-string"
+}

@@ -23,8 +23,9 @@ from librerie.citta_arte_lib import CittaArteTemplate
 from librerie.benessere_lib import BenessereTemplate
 from librerie.famiglia_lib import FamigliaTemplate
 from services.drools_service import DroolsService
-import logging
+from librerie.master_template_lib import MasterTemplateManager
 from librerie.template_manager import TemplateManager
+import logging
 
 # Configurazione del logging
 logging.basicConfig(
@@ -52,7 +53,11 @@ app.add_middleware(
 # Variabile globale per lo stato della conversazione in formato JSON
 STATO_CONVERSAZIONE_JSON = "{}"
 
-# Inizializzazione dei servizi
+# Dizionario per mantenere il contesto della conversazione per ogni template
+CONTESTO_CONVERSAZIONE = {}
+
+
+# Inizializzazione del TemplateManager e caricamento dei template
 template_manager = TemplateManager()
 template_manager.load_templates()
 template_manager.set_active_template("intro")
@@ -60,6 +65,7 @@ template_manager.update_template_sequence(["intro", "contatti","trasporto"])
 
 ollama_manager = OllamaManager()
 nu_extract = NuExtract()
+master_template_manager = MasterTemplateManager()
 
 # Inizializzazione di tutti i template
 templates = {
@@ -77,6 +83,7 @@ templates = {
     "benessere": BenessereTemplate(template_manager),
     "famiglia": FamigliaTemplate(template_manager)
 }
+
 # Inizializzazione del servizio Drools
 drools_service = DroolsService()
 
@@ -130,6 +137,56 @@ def get_empty_template(template: Dict[str, Any]) -> Dict[str, Any]:
     """
     return {k: normalize_template_value(v) for k, v in template.items()}
 
+def aggiorna_contesto_conversazione(template_attivo: str, messaggio_utente: str, risposta_bot: str):
+    """
+    Aggiorna il contesto della conversazione per il template attivo
+    
+    Args:
+        template_attivo: Il template attivo
+        messaggio_utente: Il messaggio dell'utente
+        risposta_bot: La risposta del bot
+    """
+    global CONTESTO_CONVERSAZIONE
+    
+    # Inizializza il contesto per tutti i template se non esiste
+    for template in template_manager.get_template_sequence():
+        if template not in CONTESTO_CONVERSAZIONE:
+            CONTESTO_CONVERSAZIONE[template] = []
+    
+    # Aggiungi il nuovo scambio al contesto del template attivo
+    CONTESTO_CONVERSAZIONE[template_attivo].append({
+        "utente": messaggio_utente,
+        "bot": risposta_bot
+    })
+    
+    logger.info(f"Contesto aggiornato per il template {template_attivo}")
+    logger.debug(f"Nuovo contesto: {CONTESTO_CONVERSAZIONE[template_attivo]}")
+
+def get_contesto_conversazione(template_attivo: str) -> str:
+    """
+    Ottiene il contesto della conversazione per il template attivo
+    
+    Args:
+        template_attivo: Il template attivo
+        
+    Returns:
+        str: Il contesto della conversazione formattato
+    """
+    # Inizializza il contesto per tutti i template se non esiste
+    for template in template_manager.get_template_sequence():
+        if template not in CONTESTO_CONVERSAZIONE:
+            CONTESTO_CONVERSAZIONE[template] = []
+    
+    if template_attivo not in CONTESTO_CONVERSAZIONE:
+        return ""
+    
+    contesto = []
+    for scambio in CONTESTO_CONVERSAZIONE[template_attivo]:
+        contesto.append(f"Utente: {scambio['utente']}")
+        contesto.append(f"Bot: {scambio['bot']}")
+    
+    return "\n".join(contesto)
+
 @app.post("/extract_simple")
 async def extract_simple(request: SimpleRequest):
     global STATO_CONVERSAZIONE_JSON
@@ -148,12 +205,26 @@ async def extract_simple(request: SimpleRequest):
         template_attivo = stato_attuale.get(template_manager.active_template, {})
         logger.info(f"Template attivo corrente: {template_attivo}")
         
-        # Estrai le informazioni dal testo
+        # Ottieni il contesto della conversazione
+        contesto = get_contesto_conversazione(template_manager.active_template)
+        logger.info(f"Contesto della conversazione: {contesto}")
+        
+        # Prepara il testo completo includendo il contesto
+        testo_completo = f"{contesto}\nUtente: {request.text}" if contesto else request.text
+        logging.info(f"testo_completo della conversazione: {testo_completo}")
+        # Estrai le informazioni dal testo usando NuExtract
         template_aggiornato, template_modificato = nu_extract.process_extraction(
-            text=request.text,
+            text=testo_completo,
             empty_template=template_manager.get_active_template(),
             saved_template=template_attivo
         )
+
+        # Aggiorna il template master con le nuove informazioni
+        # Processa il template master con NuExtract solo se template_attivo è "intro"
+        if template_manager.active_template == "intro":
+            master_template, master_updated = master_template_manager.process_extraction(testo_completo)
+            logger.info(f"Template master aggiornato: {master_updated}")
+        
         logger.info(f"Template modificato: {template_modificato}")
         logger.info(f"Template aggiornato: {template_aggiornato}")
         
@@ -163,7 +234,7 @@ async def extract_simple(request: SimpleRequest):
             logger.info(f"Tipo di current_template: {type(current_template)}")
             logger.info(f"Classi base di current_template: {type(current_template).__bases__}")
             # Verifica il template usando il metodo della classe base
-            template_aggiornato, warnings, errors = current_template.verifica_template(template_aggiornato)
+            template_aggiornato, template_modificato, warnings, errors = current_template.verifica_template(template_aggiornato)
             if errors:
                 logger.warning(f"Errori nel template {template_manager.active_template}: {errors}")
             if warnings:
@@ -171,7 +242,7 @@ async def extract_simple(request: SimpleRequest):
         else:
             warnings = []
             errors = []
-        
+        logger.info("template modificato: %s", template_modificato)
         # Aggiorna lo stato solo se ci sono state modifiche
         if template_modificato:
             logger.info("Aggiornamento stato conversazione")
@@ -179,7 +250,7 @@ async def extract_simple(request: SimpleRequest):
             STATO_CONVERSAZIONE_JSON = json.dumps(stato_attuale, ensure_ascii=False)
             logger.info(f"Stato aggiornato per il template {template_manager.active_template}")
             logger.info(f"Stato completo: {STATO_CONVERSAZIONE_JSON}")
-        
+
         # Verifica se il template è completo usando il metodo della classe base
         template_completo = all(
             campo in template_aggiornato and (
@@ -190,17 +261,28 @@ async def extract_simple(request: SimpleRequest):
         )
         logger.info(f"Template completo: {template_completo}")
         
-        if template_completo:
+        while template_completo:
             logger.info(f"Template {template_manager.active_template} completato")
-            
+            # Aggiorna il contesto della conversazione
+            aggiorna_contesto_conversazione(template_manager.active_template, request.text, "")
+
             # Gestione speciale per il template intro
             if template_manager.active_template == "intro":
+
+                # Processa il template intro con i dati dal master
+                template_aggiornato = master_template_manager.process_template(
+                    template_manager.active_template,
+                    template_aggiornato
+                )
+
                 logger.info("Template intro completato, preparazione chiamata evaluate_preferences")
                 # Prepara la richiesta per evaluate_preferences
                 preference_request = TravelPreferenceRequest(**template_aggiornato)
                 logger.info(f"Richiesta preferences: {preference_request.dict()}")
                 # Chiama evaluate_preferences per aggiornare la sequenza
                 await evaluate_preferences(preference_request)
+
+                
             
             # Trova il prossimo template nella sequenza
             current_index = template_manager.get_template_sequence().index(template_manager.active_template)
@@ -218,28 +300,69 @@ async def extract_simple(request: SimpleRequest):
                 empty_template = get_empty_template(template_manager.get_active_template())
                 logger.info(f"Template vuoto per {next_template}: {empty_template}")
                 logger.info(f"Template attivo: {template_manager.active_template}")
+
+                # Processa il nuovo template con i dati dal master
+                empty_template = master_template_manager.process_template(
+                    template_manager.active_template,
+                    empty_template
+                )
+
+                # Verifica il template usando il metodo della classe base
+                current_template = templates.get(template_manager.active_template)
+                if current_template:
+                    logger.info(f"Verifica template {template_manager.active_template}")
+                    empty_template, template_modificato, warnings, errors = current_template.verifica_template(empty_template)
+                    if errors:
+                        logger.warning(f"Errori nel template {template_manager.active_template}: {errors}")
+                    if warnings:
+                        logger.warning(f"Warning nel template {template_manager.active_template}: {warnings}")
+                else:
+                    warnings = []
+                    errors = []
+
+                # Aggiorna lo stato della conversazione
                 
-                try:
-                    risposta = ollama_manager.get_response(
-                        template_type=template_manager.active_template,
-                        template=empty_template
+                logger.info("Aggiornamento stato conversazione")
+                stato_attuale[template_manager.active_template] = empty_template
+                STATO_CONVERSAZIONE_JSON = json.dumps(stato_attuale, ensure_ascii=False)
+                logger.info(f"Stato aggiornato per il template {template_manager.active_template}")
+                logger.info(f"Stato completo: {STATO_CONVERSAZIONE_JSON}")
+
+                # Verifica se il template è completo usando il metodo della classe base
+                template_completo = all(
+                    campo in empty_template and (
+                        empty_template[campo] is not None and 
+                        (isinstance(empty_template[campo], bool) or empty_template[campo])
                     )
-                    logger.info(f"Risposta per il nuovo template: {risposta}")
-                except Exception as e:
-                    logger.error(f"Errore nella generazione della risposta per il nuovo template: {str(e)}")
-                    risposta = f"Benvenuto al template {next_template}. Come posso aiutarti?"
-                
-                response = {
-                    "guide_phrase": risposta,
-                    "template_usato": template_manager.active_template,
-                    "stato_conversazione": stato_attuale,
-                    "nuovo_template": True,
-                    "next_template": next_template,
-                    "warnings": warnings,
-                    "errors": errors
-                }
-                logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
-                return response
+                    for campo in template_manager.get_active_template().keys()
+                )
+                logger.info(f"Template completo: {template_completo}")
+                if not template_completo:
+                    logger.info(f"Il template {next_template} non è completo, continuazione con il nuovo template")
+                    
+                    try:
+                        risposta = ollama_manager.get_response(
+                            template_type=template_manager.active_template,
+                            template=empty_template
+                        )
+                        logger.info(f"Risposta per il nuovo template: {risposta}")
+                    except Exception as e:
+                        logger.error(f"Errore nella generazione della risposta per il nuovo template: {str(e)}")
+                        risposta = f"Benvenuto al template {next_template}. Come posso aiutarti?"
+                    
+                    
+                    
+                    response = {
+                        "guide_phrase": risposta,
+                        "template_usato": template_manager.active_template,
+                        "stato_conversazione": stato_attuale,
+                        "nuovo_template": True,
+                        "next_template": next_template,
+                        "warnings": warnings,
+                        "errors": errors
+                    }
+                    logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
+                    return response
         
         # Ottieni la risposta da Ollama
         try:
@@ -254,6 +377,9 @@ async def extract_simple(request: SimpleRequest):
             # Risposta di fallback basata sul template attivo
             if errors:
                 risposta = "Mi dispiace, sto riscontrando alcuni problemi tecnici. Potresti ripetere la tua richiesta?"
+        
+        # Aggiorna il contesto della conversazione
+        aggiorna_contesto_conversazione(template_manager.active_template, request.text, risposta)
         
         # Prepara la risposta finale
         response = {
@@ -290,7 +416,8 @@ def debug_stato():
     return {
         "stato_conversazione": stato,
         "template_attivo": template_manager.active_template,
-        "sequenza_template": template_manager.get_template_sequence()
+        "sequenza_template": template_manager.get_template_sequence(),
+        "contesto_conversazione": CONTESTO_CONVERSAZIONE
     }
 
 @app.post("/evaluate_preferences")

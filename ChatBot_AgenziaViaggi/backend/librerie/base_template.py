@@ -5,6 +5,7 @@ Contiene le funzionalità comuni a tutti i template
 
 from typing import Dict, Any, Tuple, List
 from .template_manager import TemplateManager
+import json
 
 class BaseTemplate:
     def __init__(self, template_manager: TemplateManager):
@@ -17,6 +18,42 @@ class BaseTemplate:
     def get_template_data(self) -> Dict[str, Any]:
         """Ottiene i dati del template attivo"""
         return self.template_manager.get_active_template()
+    
+    def are_data_different(self, data1: Dict[str, Any], data2: Dict[str, Any]) -> bool:
+        """
+        Compara due dizionari (incluse strutture annidate) e ritorna True se sono differenti, False altrimenti.
+        """
+        # Confronta le chiavi dei dizionari
+        if set(data1.keys()) != set(data2.keys()):
+            return True
+
+        # Confronta i valori per ogni chiave
+        for key in data1:
+            value1 = data1[key]
+            value2 = data2[key]
+
+            if isinstance(value1, dict) and isinstance(value2, dict):
+                # Se entrambi sono dizionari, confrontali ricorsivamente
+                if self.are_data_different(value1, value2):
+                    return True
+            elif isinstance(value1, list) and isinstance(value2, list):
+                # Se entrambi sono liste, confronta gli elementi
+                if len(value1) != len(value2):
+                    return True
+                for i in range(len(value1)):
+                    # Confronta gli elementi, gestendo anche dizionari o liste annidate
+                    if isinstance(value1[i], (dict, list)) or isinstance(value2[i], (dict, list)):
+                        # Serializza a JSON per un confronto semplice di strutture annidate
+                        if json.dumps(value1[i], sort_keys=True) != json.dumps(value2[i], sort_keys=True):
+                            return True
+                    elif value1[i] != value2[i]:
+                        return True
+            elif value1 != value2:
+                # Se i valori sono diversi e non sono entrambi dizionari o liste
+                return True
+
+        # Se nessun differenza trovata
+        return False 
     
     def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """

@@ -183,27 +183,39 @@ class MareTemplate(BaseTemplate):
         Returns:
             Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
         """
-        print("[DEBUG] Inizio verifica_template mare")
-        print(f"[DEBUG] Dati ricevuti: {data}")
         warnings = []
         errors = []
-        updated_data = data.copy()
-        
+        original_data = data.copy()
+        # Inizializza updated_data con tutti i campi del template, impostando quelli mancanti a None
+        updated_data = {campo: None for campo in self.get_template_data().keys()}
+        # Aggiorna con i dati ricevuti
+        updated_data.update(data)
         try:
-            # Chiama il metodo della classe base per la validazione standard
-            print("[DEBUG] Chiamata verifica_template della classe base")
+            
+            # 4. Chiama il metodo della classe base per la validazione standard
             updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
             warnings.extend(base_warnings)
             errors.extend(base_errors)
-            print(f"[DEBUG] Warnings dalla classe base: {base_warnings}")
-            print(f"[DEBUG] Errors dalla classe base: {base_errors}")
+
+            data_was_different = self.are_data_different(original_data, updated_data)
+            #verifica se è completo
+            template_completo = all(
+                campo in updated_data and (
+                    updated_data[campo] is not None and 
+                    (isinstance(updated_data[campo], bool) or updated_data[campo])
+                )
+                for campo in self.get_template_data().keys()
+            )
+            print(f"[DEBUG] Template completo: {template_completo}")
             
-            print("[DEBUG] Verifica template completata")
-            print(f"[DEBUG] Dati aggiornati: {updated_data}")
-            return updated_data, warnings, errors
+            # Se il template è completo, imposta data_was_different a True
+            if template_completo:
+                data_was_different = True
+                print("[DEBUG] Template completo, data_was_different impostato a True")
+            
+            return updated_data, data_was_different, warnings, errors
             
         except Exception as e:
-            error_msg = f"Errore durante la verifica del template: {str(e)}"
-            print(f"[ERROR] {error_msg}")
-            errors.append(error_msg)
-            return updated_data, warnings, errors 
+            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            data_was_different = self.are_data_different(original_data, updated_data)
+            return updated_data, data_was_different, warnings, errors

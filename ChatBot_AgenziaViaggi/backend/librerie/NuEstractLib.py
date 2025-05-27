@@ -13,7 +13,8 @@ class NuExtract:
 
     def process_extraction(self, text: str, empty_template: Dict[str, Any], saved_template: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
         """
-        Elabora il testo e aggiorna il template con le nuove informazioni
+        Elabora il testo e aggiorna il template con le nuove informazioni.
+        Aggiorna tutti i campi se il nuovo valore è valido (non None e non "null").
         
         Args:
             text: Il testo da analizzare
@@ -24,8 +25,6 @@ class NuExtract:
             Tuple[Dict[str, Any], bool]: Il template aggiornato e un flag che indica se sono state trovate nuove informazioni
         """
         try:
-            
-
             # Usa la funzione extract_entities da utils.py per ottenere la risposta dal modello
             result = extract_entities(
                 text=text,
@@ -42,30 +41,12 @@ class NuExtract:
                 print(f"Errore nel parsing della risposta JSON: {result}")
                 return saved_template, False
             
-            # Aggiorna il template salvato solo con i campi non già presenti
+            # Aggiorna il template con tutti i campi che hanno un valore valido
             template_updated = False
             for key, value in extracted_data.items():
-                if key not in saved_template or not saved_template[key]:
+                if value is not None and value != "null":
                     saved_template[key] = value
                     template_updated = True
-            
-            # Gestione speciale per mood_vacanza nel template intro
-            if "mood_vacanza" in extracted_data:
-                if "mood_vacanza" not in saved_template:
-                    saved_template["mood_vacanza"] = []
-                
-                # Gestione del valore estratto
-                if isinstance(extracted_data["mood_vacanza"], list):
-                    # Se è una lista, aggiungi ogni mood non presente
-                    for mood in extracted_data["mood_vacanza"]:
-                        if mood not in saved_template["mood_vacanza"]:
-                            saved_template["mood_vacanza"].append(mood)
-                            template_updated = True
-                else:
-                    # Se è un singolo valore, aggiungilo se non presente
-                    if extracted_data["mood_vacanza"] not in saved_template["mood_vacanza"]:
-                        saved_template["mood_vacanza"].append(extracted_data["mood_vacanza"])
-                        template_updated = True
             
             return saved_template, template_updated
             

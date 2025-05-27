@@ -16,6 +16,7 @@ from .template_manager import TemplateManager
 from .base_template import BaseTemplate
 
 
+
 class IntroTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
         super().__init__(template_manager)
@@ -44,154 +45,6 @@ class IntroTemplate(BaseTemplate):
         except ValueError:
             return date_str
     
-    def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
-        """
-        Valida i dati in input secondo il template
-        
-        Args:
-            data: Dizionario contenente i dati da validare
-            
-        Returns:
-            Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
-        """
-        corrected_data = data.copy()
-        template_data = self.get_template_data()
-        
-        try:
-            # Validazione nazione_destinazione
-            if 'nazione_destinazione' not in data or not data['nazione_destinazione']:
-                return False, "La nazione di destinazione è obbligatoria", corrected_data
-            
-            # Validazione regione_citta_destinazione
-            if 'regione_citta_destinazione' not in data or not data['regione_citta_destinazione']:
-                return False, "La regione/città di destinazione è obbligatoria", corrected_data
-            
-            # Validazione numero_partecipanti
-            if 'numero_partecipanti' in data:
-                if not isinstance(data['numero_partecipanti'], int):
-                    return False, "Il numero di partecipanti deve essere un intero", corrected_data
-                if data['numero_partecipanti'] <= 0:
-                    return False, "Il numero di partecipanti deve essere maggiore di zero", corrected_data
-            
-            # Validazione tipo_partecipanti
-            if 'tipo_partecipanti' in data:
-                valid_types = template_data.get('tipo_partecipanti', [])
-                if isinstance(data['tipo_partecipanti'], list):
-                    if not all(tipo in valid_types for tipo in data['tipo_partecipanti']):
-                        return False, f"I tipi di partecipanti devono essere tra: {', '.join(valid_types)}", corrected_data
-                else:
-                    if data['tipo_partecipanti'] not in valid_types:
-                        return False, f"Il tipo di partecipanti deve essere tra: {', '.join(valid_types)}", corrected_data
-            
-            # Validazione departure_date
-            if 'departure_date' in data:
-                if not isinstance(data['departure_date'], str):
-                    return False, "La data di partenza deve essere una stringa", corrected_data
-                try:
-                    corrected_data['departure_date'] = self._adjust_past_date(data['departure_date'])
-                except ValueError:
-                    return False, "La data di partenza deve essere nel formato YYYY-MM-DD", corrected_data
-            
-            # Validazione trip_duration
-            if 'trip_duration' in data:
-                if not isinstance(data['trip_duration'], int):
-                    return False, "La durata del viaggio deve essere un intero", corrected_data
-                if data['trip_duration'] <= 0:
-                    return False, "La durata del viaggio deve essere maggiore di zero", corrected_data
-            
-            # Validazione mood_vacanza
-            if 'mood_vacanza' in data:
-                valid_moods = template_data.get('mood_vacanza', [[]])[0]
-                if isinstance(data['mood_vacanza'], list):
-                    if not all(mood in valid_moods for mood in data['mood_vacanza']):
-                        return False, f"I mood della vacanza devono essere tra: {', '.join(valid_moods)}", corrected_data
-                else:
-                    if data['mood_vacanza'] not in valid_moods:
-                        return False, f"Il mood della vacanza deve essere tra: {', '.join(valid_moods)}", corrected_data
-            
-            # Validazione budget_viaggio
-            if 'budget_viaggio' in data:
-                if not isinstance(data['budget_viaggio'], int):
-                    return False, "Il budget del viaggio deve essere un intero", corrected_data
-                if data['budget_viaggio'] < 0:
-                    return False, "Il budget del viaggio non può essere negativo", corrected_data
-                if data['budget_viaggio'] > 1000000:
-                    return False, "Il budget del viaggio non può superare 1.000.000", corrected_data
-            
-            return True, "Dati validi", corrected_data
-            
-        except Exception as e:
-            return False, f"Errore durante la validazione: {str(e)}", corrected_data
-    
-    def process_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Elabora i dati secondo le regole del template
-        
-        Args:
-            data: Dizionario contenente i dati da elaborare
-            
-        Returns:
-            Dict[str, Any]: Dati elaborati
-        """
-        processed_data = {}
-        
-        # Normalizza le stringhe
-        for key in ['nazione_destinazione', 'regione_citta_destinazione', 'tipo_partecipanti']:
-            if key in data:
-                if isinstance(data[key], str):
-                    processed_data[key] = data[key].strip().lower()
-                elif isinstance(data[key], list):
-                    processed_data[key] = [item.strip().lower() if isinstance(item, str) else item for item in data[key]]
-                else:
-                    processed_data[key] = data[key]
-        
-        # Copia gli altri campi
-        for key, value in data.items():
-            if key not in processed_data:
-                processed_data[key] = value
-        
-        return processed_data
-    
-    def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
-        """
-        Verifica e aggiorna tutti i campi del template intro utilizzando le funzioni di verifica esistenti
-        
-        Args:
-            data: Dizionario contenente i dati da verificare
-            
-        Returns:
-            Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
-        """
-        warnings = []
-        errors = []
-        updated_data = data.copy()
-        
-        try:
-            # 1. Verifica destinazione generica
-            is_valid_gen, msg_gen, updated_data = self.verifica_destinazione_generica(updated_data)
-            if not is_valid_gen:
-                errors.append(msg_gen)
-            
-            # 2. Verifica destinazione locale
-            is_valid_loc, msg_loc, updated_data = self.verifica_destinazione_locale(updated_data)
-            if not is_valid_loc:
-                errors.append(msg_loc)
-
-            # 3. Verifica mood vacanza
-            is_valid_mood, msg_mood, updated_data = self.verifica_mood_vacanza(updated_data)
-            if not is_valid_mood:
-                errors.append(msg_mood)
-            
-            # 4. Chiama il metodo della classe base per la validazione standard
-            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
-            warnings.extend(base_warnings)
-            errors.extend(base_errors)
-            
-            return updated_data, warnings, errors
-            
-        except Exception as e:
-            errors.append(f"Errore durante la verifica del template: {str(e)}")
-            return updated_data, warnings, errors
 
     def verifica_destinazione_generica(self, data: Dict[str, Any], model_path: str = None) -> Tuple[bool, str, Dict[str, Any]]:
         """
@@ -471,3 +324,221 @@ class IntroTemplate(BaseTemplate):
                 cursor.close()
             if 'conn' in locals():
                 conn.close()
+
+    def verifica_tipo_partecipanti(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Verifica il tipo di partecipanti usando gli embedding.
+        Confronta l'input con le parole "adulti", "anziani" e "famiglia".
+        
+        Args:
+            data: Dizionario contenente i dati da verificare
+            
+        Returns:
+            Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
+        """
+        try:
+            if 'tipo_partecipanti' not in data or not data['tipo_partecipanti']:
+                print("Tipo partecipanti mancante o vuoto")
+                return True, "Il tipo di partecipanti è opzionale", data
+
+            tipo = data['tipo_partecipanti']
+            print(f"Verifica tipo partecipanti per: {tipo}")
+
+            # Lista di tipi validi
+            tipi_validi = ["adulti", "anziani", "famiglia"]
+            
+            try:
+                print(f"Generazione embedding per tipo: '{tipo}'")
+                tipo_embedding = self.model.encode(tipo)
+                print(f"Embedding generato con successo, dimensione: {len(tipo_embedding)}")
+                
+                # Genera embedding per tutti i tipi validi
+                tipi_validi_embeddings = [self.model.encode(t) for t in tipi_validi]
+                
+                # Calcola la distanza con tutti i tipi validi
+                distanze = [np.linalg.norm(tipo_embedding - t) for t in tipi_validi_embeddings]
+                
+                # Trova il tipo valido più vicino
+                indice_min = np.argmin(distanze)
+                distanza_min = distanze[indice_min]
+                
+                print(f"Distanza minima trovata: {distanza_min} per tipo '{tipi_validi[indice_min]}'")
+                
+                if distanza_min < 0.4:  # Soglia di similarità
+                    print(f"Aggiornamento tipo da '{tipo}' a '{tipi_validi[indice_min]}'")
+                    data['tipo_partecipanti'] = tipi_validi[indice_min]
+                else:
+                    print(f"Tipo '{tipo}' non ha corrispondenze sufficientemente simili")
+                    data['tipo_partecipanti'] = tipo
+
+            except Exception as e:
+                print(f"Errore durante la generazione dell'embedding per '{tipo}': {str(e)}")
+                print(f"Tipo di errore: {type(e)}")
+                import traceback
+                print("Stack trace:")
+                print(traceback.format_exc())
+                data['tipo_partecipanti'] = tipo
+
+            print(f"Tipo finale: {data['tipo_partecipanti']}")
+            return True, "Tipo partecipanti verificato", data
+
+        except Exception as e:
+            print(f"Errore durante la verifica del tipo partecipanti: {str(e)}")
+            return False, f"Errore durante la verifica del tipo partecipanti: {str(e)}", data
+
+    def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Valida i dati in input secondo il template
+        validate_data
+        Args:
+            data: Dizionario contenente i dati da validare
+            
+        Returns:
+            Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
+        """
+        print("[DEBUG] Inizio validazione dati intro metodo Intro.validate_data")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        
+        # Crea una copia dei dati originali per il confronto
+        corrected_data = data.copy()
+        
+        try:
+            # Verifica nazione_destinazione
+            is_valid, message, corrected_data = self.verifica_destinazione_generica(corrected_data)
+            if not is_valid:
+                return False, message, corrected_data
+            
+            # Verifica regione_citta_destinazione
+            is_valid, message, corrected_data = self.verifica_destinazione_locale(corrected_data)
+            if not is_valid:
+                return False, message, corrected_data
+            
+            # Verifica mood_vacanza
+            is_valid, message, corrected_data = self.verifica_mood_vacanza(corrected_data)
+            if not is_valid:
+                return False, message, corrected_data
+            
+            # Validazione numero_partecipanti
+            if 'numero_partecipanti' in corrected_data:
+                if not isinstance(corrected_data['numero_partecipanti'], int):
+                    return False, "Il numero di partecipanti deve essere un intero", corrected_data
+                if corrected_data['numero_partecipanti'] <= 0:
+                    return False, "Il numero di partecipanti deve essere maggiore di zero", corrected_data
+            
+            # Validazione tipo_partecipanti
+            is_valid, message, corrected_data = self.verifica_tipo_partecipanti(corrected_data)
+            if not is_valid:
+                return False, message, corrected_data
+            
+            # Validazione departure_date
+            if 'departure_date' in corrected_data:
+                if not isinstance(corrected_data['departure_date'], str):
+                    return False, "La data di partenza deve essere una stringa", corrected_data
+                try:
+                    corrected_data['departure_date'] = self._adjust_past_date(corrected_data['departure_date'])
+                except ValueError:
+                    return False, "La data di partenza deve essere nel formato YYYY-MM-DD", corrected_data
+            
+            # Validazione trip_duration
+            if 'trip_duration' in corrected_data:
+                if not isinstance(corrected_data['trip_duration'], int):
+                    return False, "La durata del viaggio deve essere un intero", corrected_data
+                if corrected_data['trip_duration'] <= 0:
+                    return False, "La durata del viaggio deve essere maggiore di zero", corrected_data
+            
+            # Validazione budget_viaggio
+            if 'budget_viaggio' in corrected_data:
+                if not isinstance(corrected_data['budget_viaggio'], int):
+                    return False, "Il budget del viaggio deve essere un intero", corrected_data
+                if corrected_data['budget_viaggio'] < 0:
+                    return False, "Il budget del viaggio non può essere negativo", corrected_data
+                if corrected_data['budget_viaggio'] > 1000000:
+                    return False, "Il budget del viaggio non può superare 1.000.000", corrected_data
+            
+            print("[DEBUG] Validazione completata con successo")
+            print(f"[DEBUG] Dati corretti: {corrected_data}")
+            return True, "Dati validi", corrected_data
+            
+        except Exception as e:
+            # Anche in caso di errore, confrontiamo i dati se possibile
+            return False, f"Errore durante la validazione: {str(e)}", corrected_data
+    
+    def process_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Elabora i dati secondo le regole del template
+        
+        Args:
+            data: Dizionario contenente i dati da elaborare
+            
+        Returns:
+            Dict[str, Any]: Dati elaborati
+        """
+        processed_data = {}
+        
+        # Normalizza le stringhe
+        for key in ['nazione_destinazione', 'regione_citta_destinazione', 'tipo_partecipanti']:
+            if key in data:
+                if isinstance(data[key], str):
+                    processed_data[key] = data[key].strip().lower()
+                elif isinstance(data[key], list):
+                    processed_data[key] = [item.strip().lower() if isinstance(item, str) else item for item in data[key]]
+                else:
+                    processed_data[key] = data[key]
+        
+        # Copia gli altri campi
+        for key, value in data.items():
+            if key not in processed_data:
+                processed_data[key] = value
+        
+        return processed_data
+    
+    def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """
+        Verifica e aggiorna tutti i campi del template intro utilizzando le funzioni di verifica esistenti
+        
+        Args:
+            data: Dizionario contenente i dati da verificare
+            
+        Returns:
+            Tuple[Dict[str, Any], List[str], List[str]]: (template aggiornato, warnings, errors)
+        """
+        print("[DEBUG] Inizio verifica_template intro")
+        print(f"[DEBUG] Dati ricevuti: {data}")
+        warnings = []
+        errors = []
+        original_data = data.copy()
+        
+        # Inizializza updated_data con tutti i campi del template, impostando quelli mancanti a None
+        updated_data = {campo: None for campo in self.get_template_data().keys()}
+        # Aggiorna con i dati ricevuti
+        updated_data.update(data)
+        
+        try:
+            # Chiama il metodo della classe base per la validazione standard
+            updated_data, base_warnings, base_errors = super().verifica_template(updated_data)
+            warnings.extend(base_warnings)
+            errors.extend(base_errors)
+
+            data_was_different = self.are_data_different(original_data, updated_data)
+            #verifica se è completo
+            template_completo = all(
+                campo in updated_data and (
+                    updated_data[campo] is not None and 
+                    (isinstance(updated_data[campo], bool) or updated_data[campo])
+                )
+                for campo in self.get_template_data().keys()
+            )
+            print(f"[DEBUG] Template completo: {template_completo}")
+            
+            # Se il template è completo, imposta data_was_different a True
+            if template_completo:
+                data_was_different = True
+                print("[DEBUG] Template completo, data_was_different impostato a True")
+            
+            return updated_data, data_was_different, warnings, errors
+            
+        except Exception as e:
+            errors.append(f"Errore durante la verifica del template: {str(e)}")
+            data_was_different = self.are_data_different(original_data, updated_data)
+            return updated_data, data_was_different, warnings, errors
+    
