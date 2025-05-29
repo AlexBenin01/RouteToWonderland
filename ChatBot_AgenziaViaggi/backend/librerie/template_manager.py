@@ -32,6 +32,7 @@ class TemplateManager:
             "citta_arte": "citta_arte.json",
             "benessere": "benessere.json",
             "famiglia": "famiglia.json",
+            "exit": "exit.json"
         }
         
         for template_name, file_name in template_files.items():
@@ -106,3 +107,12 @@ class TemplateManager:
             Dict[str, Dict[str, Any]]: Dizionario con tutti i template
         """
         return self.templates.copy() 
+    
+    def get_exit_template(self) -> Optional[Dict[str, Any]]:
+        """
+        Ottiene il template di uscita
+        
+        Returns:
+            Optional[Dict[str, Any]]: Il template di uscita o None se non esiste
+        """
+        return self.templates.get("exit")

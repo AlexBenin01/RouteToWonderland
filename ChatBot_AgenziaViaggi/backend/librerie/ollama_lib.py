@@ -127,3 +127,45 @@ Ora, formula la tua domanda:"""
                 return bool(response.strip())
         except:
             return False 
+        
+    def get_exit(self) -> str:
+        """Restituisce una frase guida per chiedere se concludere la conversazione"""
+        try:
+            prompt = """Sei un assistente di viaggio esperto e cordiale. Il tuo compito è chiedere all'utente se desidera concludere la conversazione.
+
+IMPORTANTE:
+- La domanda deve essere in italiano
+- Deve essere naturale e conversazionale
+- Deve dare l'impressione che l'assistente sia disponibile a continuare se l'utente lo desidera
+- Non deve essere troppo diretta o brusca
+
+Ora, formula la tua domanda:"""
+
+            response = requests.post(
+                f"{self.base_url}/generate",
+                json={
+                    "model": self.model_name,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "top_p": 0.9,
+                        "top_k": 40,
+                        "system": "Sei un assistente di viaggio esperto e cordiale. Rispondi sempre in italiano."
+                    }
+                }
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                response_text = result.get("response", "Mi dispiace, non sono riuscito a generare una risposta appropriata.")
+                # Estrai solo il testo in italiano (dopo l'ultima riga vuota)
+                _text = response_text.split('\n\n')[-1].strip()
+                # Rimuovi le emoji dalla risposta
+                #_text = re.sub(r'[^\x00-\x7F]+', '', _text)
+                return _text
+            else:
+                return f"Errore nella comunicazione con Ollama: {response.status_code}"
+        except Exception as e:
+            return f"Si è verificato un errore: {str(e)}" 
+        

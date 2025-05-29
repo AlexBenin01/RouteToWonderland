@@ -1,3 +1,5 @@
 {
-    "next_step":"boolean"
+    "next_step":"boolean",
+    "exit":"boolean",
+    "quit":"boolean"
 }

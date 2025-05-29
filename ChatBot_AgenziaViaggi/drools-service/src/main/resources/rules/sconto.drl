@@ -1,0 +1,34 @@
+package com.routetowonderland.drools.rules;
+
+import com.routetowonderland.drools.model.RichiestaSconto;
+import com.routetowonderland.drools.model.RispostaSconto;
+
+// Regola per il grado A: Cliente con alto valore e alto fatturato
+rule "Grado A - Cliente Premium"
+    when
+        $richiesta : RichiestaSconto(totale_speso >= 10000, fatturato_annuale >= 50000)
+        $risposta : RispostaSconto()
+    then
+        $risposta.setGrado_sconto("A");
+end
+
+// Regola per il grado B: Cliente con valore medio o fatturato medio
+rule "Grado B - Cliente Standard"
+    when
+        $richiesta : RichiestaSconto(
+            (totale_speso >= 5000 && totale_speso < 10000) || 
+            (fatturato_annuale >= 25000 && fatturato_annuale < 50000)
+        )
+        $risposta : RispostaSconto()
+    then
+        $risposta.setGrado_sconto("B");
+end
+
+// Regola per il grado C: Cliente con basso valore o basso fatturato
+rule "Grado C - Cliente Base"
+    when
+        $richiesta : RichiestaSconto(totale_speso < 5000, fatturato_annuale < 25000)
+        $risposta : RispostaSconto()
+    then
+        $risposta.setGrado_sconto("C");
+end 

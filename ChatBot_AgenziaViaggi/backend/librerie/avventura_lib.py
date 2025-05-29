@@ -51,9 +51,16 @@ class AvventuraTemplate(BaseTemplate):
         
         try:
             if 'livello_difficolta' not in data or not data['livello_difficolta']:
+                corrected_data['livello_difficolta'] = []
                 return True, "Il livello di difficoltà mancante", corrected_data
 
-            print(f"Verifica livello di difficoltà per: {data['livello_difficolta']}")
+            # Assicuriamoci che livello_difficolta sia una stringa
+            livello_difficolta = str(data['livello_difficolta']).strip()
+            if not livello_difficolta:
+                corrected_data['livello_difficolta'] = []
+                return True, "Il livello di difficoltà è vuoto", corrected_data
+
+            print(f"Verifica livello di difficoltà per: {livello_difficolta}")
 
             print("Tentativo di connessione al database...")
             conn = psycopg2.connect(
@@ -67,8 +74,8 @@ class AvventuraTemplate(BaseTemplate):
             cursor = conn.cursor()
 
             try:
-                print(f"Generazione embedding per difficoltà: '{data['livello_difficolta']}'")
-                difficolta_embedding = self.model.encode(data['livello_difficolta'])
+                print(f"Generazione embedding per difficoltà: '{livello_difficolta}'")
+                difficolta_embedding = self.model.encode(livello_difficolta)
                 print(f"Embedding generato con successo, dimensione: {len(difficolta_embedding)}")
                 difficolta_embedding = difficolta_embedding.tolist()
 
@@ -88,15 +95,15 @@ class AvventuraTemplate(BaseTemplate):
                     difficolta_corretta, distanza = risultato[0]
                     print(f"Distanza trovata: {distanza}")
                     if distanza < 0.4:
-                        print(f"Aggiornamento difficoltà da '{data['livello_difficolta']}' a '{difficolta_corretta}'")
+                        print(f"Aggiornamento difficoltà da '{livello_difficolta}' a '{difficolta_corretta}'")
                         corrected_data['livello_difficolta'] = difficolta_corretta
                         return True, "Livello di difficoltà verificato", corrected_data
                     else:
-                        print(f"Livello di difficoltà '{data['livello_difficolta']}' non ha corrispondenze sufficientemente simili")
+                        print(f"Livello di difficoltà '{livello_difficolta}' non ha corrispondenze sufficientemente simili")
                         corrected_data['livello_difficolta'] = None
                         return True, "Livello di difficoltà non valido", corrected_data
                 else:
-                    print(f"Nessun risultato trovato per il livello di difficoltà '{data['livello_difficolta']}'")
+                    print(f"Nessun risultato trovato per il livello di difficoltà '{livello_difficolta}'")
                     corrected_data['livello_difficolta'] = None
                     return True, "Livello di difficoltà non valido", corrected_data
 
@@ -325,7 +332,7 @@ class AvventuraTemplate(BaseTemplate):
                 print(f"[DEBUG] livello_difficolta validato: {corrected_data.get('livello_difficolta')}")
 
             #se guida_menzionata è null, allora non è presente guida_esperta
-            if data.get('guida_menzionata') is None:
+            if data['guida_menzionata'] is None:
                 print("[DEBUG] guida_menzionata è null, allora non è presente guida_esperta")
                 corrected_data['guida_esperta'] = None
             if data.get('guida_menzionata') is True:
@@ -335,33 +342,26 @@ class AvventuraTemplate(BaseTemplate):
                 print("[DEBUG] guida_menzionata è false, allora non è presente guida_esperta")
                 corrected_data['guida_esperta'] = False
 
-            # Validazione guida_esperta e gestione lingua_guida
+
+            # Gestione guida esperta e lingua
             if 'guida_esperta' in data:
-                print(f"[DEBUG] Validazione guida_esperta: {data['guida_esperta']}")
-                if not isinstance(data['guida_esperta'], bool):
-                    print(f"[ERROR] guida_esperta non è un booleano: {data['guida_esperta']}")
-                    corrected_data['guida_esperta'] = None
-                
-                # Se guida_esperta è false, imposta lingua_guida a "no guida"
-                if corrected_data.get('guida_esperta') is False:
-                    print("[DEBUG] guida_esperta è false, imposto lingua_guida a 'no guida'")
+                print(f"[DEBUG] Verifica guida esperta: {data['guida_esperta']}")
+                if data['guida_esperta'] is False:  # Verifica esplicita per False
+                    print("[DEBUG] Richiesta guida turistica impostata a False")
                     corrected_data['lingua_guida'] = "no guida"
-                print(f"[DEBUG] guida_esperta validato: {corrected_data.get('guida_esperta')}")
-
-            # Verifica lingua_guida
-            if 'lingua_guida' in data:
-                print(f"[DEBUG] Verifica lingua_guida: {data['lingua_guida']}")
-                if not data['lingua_guida'] or data['lingua_guida'].strip() == "":
-                    print(f"[ERROR] lingua_guida è vuoto")
-                    if corrected_data.get('guida_esperta', False):
-                        corrected_data['lingua_guida'] = None
+                    print(f"[DEBUG] Lingua guida impostata a: {corrected_data['lingua_guida']}")
+                elif data['guida_esperta'] is True:  # Verifica esplicita per True
+                    if 'lingua_guida' not in data or not data['lingua_guida']:
+                        print("[ERROR] Lingua guida mancante o non specificata")
+                        return False, "La lingua della guida è obbligatoria quando è richiesta una guida esperta", corrected_data
                     else:
-                        corrected_data['lingua_guida'] = "no guida"
-                else:
-                    is_valid, error_msg, updated_data = self.validate_lingua(corrected_data)
-                    corrected_data.update(updated_data)
-                print(f"[DEBUG] lingua_guida validato: {corrected_data.get('lingua_guida')}")
-
+                        print("[DEBUG] Validazione lingua guida")
+                        is_valid, error_msg, updated_data = self.validate_lingua(corrected_data)
+                        corrected_data.update(updated_data)
+                        print(f"[DEBUG] Lingua guida validata: {corrected_data.get('lingua_guida')}")
+            else:
+                print("[ERROR] Campo guida_esperta mancante")
+                return False, "Il campo guida_esperta è obbligatorio", corrected_data
             print("[DEBUG] Validazione completata con successo")
             print(f"[DEBUG] Dati corretti: {corrected_data}")
             return True, "Dati validi", corrected_data

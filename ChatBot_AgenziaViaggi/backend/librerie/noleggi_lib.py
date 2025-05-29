@@ -130,10 +130,10 @@ class NoleggiTemplate(BaseTemplate):
                     print("[ERROR] posti_auto non è un intero")
                     corrected_data['posti_auto'] = None
                     return False, "Il numero di posti auto deve essere un numero intero", corrected_data
-                if data['posti_auto'] < 2 or data['posti_auto'] > 12:
-                    print("[ERROR] posti_auto fuori range (2-12)")
+                if data['posti_auto'] < 2:
+                    print("[ERROR] posti_auto fuori range (2- XX)")
                     corrected_data['posti_auto'] = None
-                    return False, "Il numero di posti auto deve essere compreso tra 2 e 12", corrected_data
+                    return False, "Il numero di posti auto deve essere compreso tra 2 e XX", corrected_data
                 print(f"[DEBUG] posti_auto valido: {data['posti_auto']}")
 
             

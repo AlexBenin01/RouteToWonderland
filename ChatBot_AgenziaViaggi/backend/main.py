@@ -25,17 +25,20 @@ from librerie.famiglia_lib import FamigliaTemplate
 from services.drools_service import DroolsService
 from librerie.master_template_lib import MasterTemplateManager
 from librerie.template_manager import TemplateManager
+from librerie.riepilogo import process_riepilogo
 import logging
+import sys
 
-# Configurazione del logging
+# Configura il logger per gestire correttamente i caratteri Unicode
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('app.log'),
-        logging.StreamHandler()
-    ]
+        logging.StreamHandler(sys.stdout)
+    ],
+    encoding='utf-8'
 )
+
 logger = logging.getLogger(__name__)
 
 # Avvia FastAPI
@@ -56,12 +59,14 @@ STATO_CONVERSAZIONE_JSON = "{}"
 # Dizionario per mantenere il contesto della conversazione per ogni template
 CONTESTO_CONVERSAZIONE = {}
 
+# Contatore per le richieste di uscita
+EXIT_COUNTER = 0
 
 # Inizializzazione del TemplateManager e caricamento dei template
 template_manager = TemplateManager()
 template_manager.load_templates()
-template_manager.set_active_template("intro")
-template_manager.update_template_sequence(["intro", "contatti","trasporto"])
+template_manager.set_active_template("avventura")
+template_manager.update_template_sequence(["avventura", "contatti","trasporto"])
 
 ollama_manager = OllamaManager()
 nu_extract = NuExtract()
@@ -189,7 +194,7 @@ def get_contesto_conversazione(template_attivo: str) -> str:
 
 @app.post("/extract_simple")
 async def extract_simple(request: SimpleRequest):
-    global STATO_CONVERSAZIONE_JSON
+    global STATO_CONVERSAZIONE_JSON, EXIT_COUNTER
     
     logger.info("\n=== INIZIO RICHIESTA EXTRACT_SIMPLE ===")
     logger.info(f"Testo ricevuto: {request.text}")
@@ -213,8 +218,8 @@ async def extract_simple(request: SimpleRequest):
         testo_completo = f"{contesto}\nUtente: {request.text}" if contesto else request.text
         logging.info(f"testo_completo della conversazione: {testo_completo}")
         # Estrai le informazioni dal testo usando NuExtract
-        template_aggiornato, template_modificato = nu_extract.process_extraction(
-            text=testo_completo,
+        template_aggiornato = nu_extract.process_extraction(
+            text=request.text, #temporaneo poi testo_completo
             empty_template=template_manager.get_active_template(),
             saved_template=template_attivo
         )
@@ -222,12 +227,105 @@ async def extract_simple(request: SimpleRequest):
         # Aggiorna il template master con le nuove informazioni
         # Processa il template master con NuExtract solo se template_attivo è "intro"
         if template_manager.active_template == "intro":
-            master_template, master_updated = master_template_manager.process_extraction(testo_completo)
-            logger.info(f"Template master aggiornato: {master_updated}")
+            master_template = master_template_manager.process_extraction(testo_completo)
+
+        template_modificato = False
         
-        logger.info(f"Template modificato: {template_modificato}")
+        # Confronta template_aggiornato con template_attivo
+        logger.info("=== INIZIO CONFRONTO TEMPLATE ===")
+        logger.info(f"Template attivo: {json.dumps(template_attivo, ensure_ascii=False, indent=2)}")
+        logger.info(f"Template aggiornato: {json.dumps(template_aggiornato, ensure_ascii=False, indent=2)}")
+        
+        # Se template_attivo è vuoto, consideriamo il template come modificato
+        if not template_attivo:
+            logger.info("Template attivo vuoto - Template modificato")
+            template_modificato = True
+        else:
+            # Verifica se ci sono chiavi nuove in template_aggiornato
+            nuove_chiavi = set(template_aggiornato.keys()) - set(template_attivo.keys())
+            if nuove_chiavi:
+                logger.info(f"Trovate nuove chiavi: {nuove_chiavi} - Template modificato")
+                template_modificato = True
+            else:
+                # Confronta i valori per ogni chiave esistente
+                for key in template_attivo:
+                    if key not in template_aggiornato:
+                        logger.info(f"Chiave {key} mancante in template_aggiornato - Template modificato")
+                        template_modificato = True
+                        break
+                        
+                    valore_aggiornato = template_aggiornato[key]
+                    valore_attivo = template_attivo[key]
+                    
+                    logger.info(f"\nConfronto chiave: {key}")
+                    logger.info(f"Valore aggiornato: {valore_aggiornato}")
+                    logger.info(f"Valore attivo: {valore_attivo}")
+                    
+                    # Confronto diretto dei valori, indipendentemente dal tipo
+                    if valore_aggiornato != valore_attivo:
+                        logger.info(f"Valori diversi per la chiave {key} - Template modificato")
+                        template_modificato = True
+                        break
+                    else:
+                        logger.info(f"Valori uguali per la chiave {key}")
+        
+        logger.info(f"=== FINE CONFRONTO TEMPLATE - Template modificato: {template_modificato} ===")
         logger.info(f"Template aggiornato: {template_aggiornato}")
-        
+        if not template_modificato:
+            logger.info("Nessuna modifica al template, verifica se è una richiesta di uscita")
+            # Verifica se è una richiesta di uscita
+            template_exit = nu_extract.process_exit(
+                text=request.text,
+                empty_template=template_manager.get_exit_template()
+            )
+            
+            if template_exit is not None or template_exit == 'null':
+                template_exit = False
+
+
+            if template_exit:
+                logger.info("Richiesta di uscita template_exit:True")
+                EXIT_COUNTER = 0  # Reset del contatore se è una richiesta di uscita valida
+                risposta = ollama_manager.get_exit()
+                logger.info(risposta)
+                response = {
+                        "guide_phrase": risposta,
+                        "template_usato": template_manager.active_template,
+                        "stato_conversazione": stato_attuale,
+                        "exit": True
+                    }
+                logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
+                return response
+            else:
+                EXIT_COUNTER += 1
+                if EXIT_COUNTER >= 2:
+                    logger.info("Raggiunto il limite di tentativi, richiesta di uscita")
+                    risposta = ollama_manager.get_exit()
+                    logger.info(risposta)
+                    response = {
+                            "guide_phrase": risposta,
+                            "template_usato": template_manager.active_template,
+                            "stato_conversazione": stato_attuale,
+                            "exit": True
+                        }
+                    logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
+                    return response
+                else:
+                    logger.info(f"Tentativo {EXIT_COUNTER} di 2, continuo con la conversazione")
+                    risposta = ollama_manager.get_response(
+                        template_type=template_manager.active_template,
+                        template=template_aggiornato
+                    )
+                    response = {
+                        "guide_phrase": risposta,
+                        "template_usato": template_manager.active_template,
+                        "stato_conversazione": stato_attuale,
+                        "exit": False
+                    }
+                    logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
+                    return response
+
+        EXIT_COUNTER = 0  # Reset del contatore se ci sono state modifiche al template
         # Ottieni l'istanza del template corrente
         current_template = templates.get(template_manager.active_template)
         if current_template:
@@ -358,8 +456,7 @@ async def extract_simple(request: SimpleRequest):
                         "stato_conversazione": stato_attuale,
                         "nuovo_template": True,
                         "next_template": next_template,
-                        "warnings": warnings,
-                        "errors": errors
+                        "exit": False
                     }
                     logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
                     return response
@@ -386,8 +483,7 @@ async def extract_simple(request: SimpleRequest):
             "guide_phrase": risposta,
             "template_usato": template_manager.active_template,
             "stato_conversazione": stato_attuale,
-            "warnings": warnings,
-            "errors": errors
+            "exit": False
         }
         
         logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE ===")
@@ -465,6 +561,204 @@ async def get_templates():
 async def get_template_sequence():
     """Endpoint per ottenere la sequenza dei template"""
     return template_manager.get_template_sequence()
+
+@app.post("/skip_template")
+async def skip_template():
+    """Endpoint per saltare il template corrente e passare al successivo"""
+    global STATO_CONVERSAZIONE_JSON, EXIT_COUNTER
+    
+    logger.info("\n=== INIZIO RICHIESTA SKIP_TEMPLATE ===")
+    logger.info(f"Template attivo prima del salto: {template_manager.active_template}")
+    
+    try:
+        # Carica lo stato attuale
+        stato_attuale = json.loads(STATO_CONVERSAZIONE_JSON)
+        
+        # Ottieni l'indice del template corrente
+        current_index = template_manager.get_template_sequence().index(template_manager.active_template)
+        
+        if current_index < len(template_manager.get_template_sequence()) - 1:
+            # Ottieni il prossimo template
+            next_template = template_manager.get_template_sequence()[current_index + 1]
+            logger.info(f"Passaggio al prossimo template: {next_template}")
+            
+            # Cambia il template attivo
+            template_manager.set_active_template(next_template)
+            
+            # Ottieni il template vuoto per il nuovo template
+            empty_template = get_empty_template(template_manager.get_active_template())
+            
+            # Processa il nuovo template con i dati dal master
+            empty_template = master_template_manager.process_template(
+                template_manager.active_template,
+                empty_template
+            )
+            
+            # Verifica il template usando il metodo della classe base
+            current_template = templates.get(template_manager.active_template)
+            if current_template:
+                logger.info(f"Verifica template {template_manager.active_template}")
+                empty_template, template_modificato, warnings, errors = current_template.verifica_template(empty_template)
+                if errors:
+                    logger.warning(f"Errori nel template {template_manager.active_template}: {errors}")
+                if warnings:
+                    logger.warning(f"Warning nel template {template_manager.active_template}: {warnings}")
+            else:
+                warnings = []
+                errors = []
+            
+            # Verifica se il template è già completo
+            template_completo = all(
+                campo in empty_template and (
+                    empty_template[campo] is not None and 
+                    (isinstance(empty_template[campo], bool) or empty_template[campo])
+                )
+                for campo in template_manager.get_active_template().keys()
+            )
+            
+            # Aggiorna lo stato della conversazione
+            stato_attuale[template_manager.active_template] = empty_template
+            STATO_CONVERSAZIONE_JSON = json.dumps(stato_attuale, ensure_ascii=False)
+            
+            # Resetta il contatore di uscita
+            EXIT_COUNTER = 0
+            
+            if template_completo:
+                logger.info(f"Il template {next_template} è già completo grazie al master template")
+                # Se il template è completo, passa automaticamente al successivo
+                return await skip_template()
+            
+            # Ottieni la risposta iniziale per il nuovo template
+            try:
+                risposta = ollama_manager.get_response(
+                    template_type=template_manager.active_template,
+                    template=empty_template
+                )
+            except Exception as e:
+                logger.error(f"Errore nella generazione della risposta per il nuovo template: {str(e)}")
+                risposta = f"Benvenuto al template {next_template}. Come posso aiutarti?"
+            
+            response = {
+                "guide_phrase": risposta,
+                "template_usato": template_manager.active_template,
+                "stato_conversazione": stato_attuale,
+                "nuovo_template": True,
+                "next_template": next_template,
+                "exit": False
+            }
+            
+            logger.info("=== FINE RICHIESTA SKIP_TEMPLATE ===")
+            return response
+        else:
+            logger.info("Non ci sono più template nella sequenza")
+            return {
+                "guide_phrase": "Hai completato tutti i template disponibili.",
+                "template_usato": template_manager.active_template,
+                "stato_conversazione": stato_attuale,
+                "nuovo_template": False,
+                "exit": False
+            }
+            
+    except Exception as e:
+        logger.error(f"Errore in skip_template: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/get_continue")
+async def get_continue():
+    """Endpoint per riproporre la domanda del primo campo libero del template attivo"""
+    global STATO_CONVERSAZIONE_JSON
+    
+    logger.info("\n=== INIZIO RICHIESTA GET_CONTINUE ===")
+    logger.info(f"Template attivo: {template_manager.active_template}")
+    
+    try:
+        # Carica lo stato attuale
+        stato_attuale = json.loads(STATO_CONVERSAZIONE_JSON)
+        logger.info(f"Stato attuale: {json.dumps(stato_attuale, ensure_ascii=False, indent=2)}")
+        
+        # Ottieni il template attivo
+        template_attivo = stato_attuale.get(template_manager.active_template, {})
+        logger.info(f"Template attivo corrente: {json.dumps(template_attivo, ensure_ascii=False, indent=2)}")
+        
+        # Ottieni il template vuoto per il template attivo
+        empty_template = get_empty_template(template_manager.get_active_template())
+        logger.info(f"Template vuoto: {json.dumps(empty_template, ensure_ascii=False, indent=2)}")
+        
+        # Ottieni la risposta da Ollama per il primo campo libero
+        try:
+            logger.info("Richiesta risposta a Ollama...")
+            risposta = ollama_manager.get_response(
+                template_type=template_manager.active_template,
+                template=template_attivo
+            )
+            logger.info(f"Risposta ottenuta da Ollama: {risposta}")
+        except Exception as ollama_error:
+            logger.error(f"Errore nella comunicazione con Ollama: {str(ollama_error)}")
+            risposta = f"Mi dispiace, sto riscontrando alcuni problemi tecnici. Potresti ripetere la tua richiesta?"
+        
+        response = {
+            "guide_phrase": risposta,
+            "template_usato": template_manager.active_template,
+            "stato_conversazione": stato_attuale,
+            "exit": False
+        }
+        
+        logger.info(f"Risposta finale: {json.dumps(response, ensure_ascii=False, indent=2)}")
+        logger.info("=== FINE RICHIESTA GET_CONTINUE ===")
+        return response
+        
+    except Exception as e:
+        logger.error(f"Errore in get_continue: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/get_summary")
+async def get_summary():
+    """Endpoint per ottenere il riepilogo completo di tutti i template"""
+    global STATO_CONVERSAZIONE_JSON
+    
+    logger.info("\n=== INIZIO RICHIESTA GET_SUMMARY ===")
+    
+    try:
+        # Copia la sequenza dei template
+        template_sequence = template_manager.get_template_sequence().copy()
+        logger.info(f"Sequenza template copiata: {template_sequence}")
+        
+        # Copia lo stato della conversazione
+        stato_attuale = json.loads(STATO_CONVERSAZIONE_JSON)
+        logger.info(f"Stato conversazione copiato: {json.dumps(stato_attuale, ensure_ascii=False, indent=2)}")
+        
+        # Ottieni l'indice del template attivo
+        current_index = template_sequence.index(template_manager.active_template)
+        logger.info(f"Indice template attivo: {current_index}")
+        
+        # Per ogni template successivo a quello attivo nella sequenza
+        for template_name in template_sequence[current_index + 1:]:
+            # Ottieni il template vuoto
+            empty_template = get_empty_template(template_manager.get_template(template_name))
+            
+            # Processa il template con i dati dal master
+            completed_template = master_template_manager.process_template(
+                template_name,
+                empty_template
+            )
+            
+            # Aggiorna lo stato della conversazione con il template completato
+            stato_attuale[template_name] = completed_template
+            
+            logger.info(f"Template {template_name} completato e aggiunto al riepilogo")
+        
+        # Processa il riepilogo completo
+        riepilogo_elaborato = process_riepilogo(json.dumps(stato_attuale))
+        logger.info("Riepilogo elaborato con successo")
+        
+        logger.info("=== FINE RICHIESTA GET_SUMMARY ===")
+        return riepilogo_elaborato
+        
+    except Exception as e:
+        logger.error(f"Errore in get_summary: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 
