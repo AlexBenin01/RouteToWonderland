@@ -1,6 +1,6 @@
-package com.traveltorules.rules;
+package com.routetowonderland.drools.rules;
 
-import com.traveltorules.model.TravelPreference;
+import com.routetowonderland.drools.model.TravelPreference;
 import java.util.ArrayList;
 import java.util.List;
 

@@ -1,4 +1,9 @@
-com\traveltorules\controller\PreferenceController.class
-com\traveltorules\service\RuleService.class
-com\traveltorules\model\TravelPreference.class
-com\traveltorules\DroolsApplication.class
+com\routetowonderland\drools\service\ScontoService.class
+com\routetowonderland\drools\controller\PreferenceController.class
+com\routetowonderland\drools\model\RispostaSconto.class
+com\routetowonderland\drools\model\RichiestaSconto.class
+com\routetowonderland\drools\model\TravelPreference.class
+com\routetowonderland\drools\service\RuleService.class
+com\routetowonderland\drools\controller\ScontoController.class
+com\routetowonderland\drools\DroolsApplication.class
+com\routetowonderland\drools\config\DroolsConfig.class

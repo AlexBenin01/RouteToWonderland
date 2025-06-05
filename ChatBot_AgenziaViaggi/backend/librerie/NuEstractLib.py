@@ -24,6 +24,9 @@ class NuExtract:
         Returns:
             Tuple[Dict[str, Any], bool]: Il template aggiornato e un flag che indica se sono state trovate nuove informazioni
         """
+        print(f"Empty template Nuestract: {empty_template}")
+        print(f"Saved template Nuestract: {saved_template}")
+        # Verifica che il modello esista
         try:
             # Usa la funzione extract_entities da utils.py per ottenere la risposta dal modello
             result = extract_entities(
@@ -95,7 +98,7 @@ class NuExtract:
             
             # Se almeno uno dei valori è True, significa che vogliamo uscire
             if extracted_data.get('next_step') is True or extracted_data.get('exit') is True or extracted_data.get('quit') is True:
-                print("True - Vogliamo uscire")
+                print("imposto a True - Vogliamo uscire")
                 return True
             
             # Se next_step è False o exit è False, significa che vogliamo uscire

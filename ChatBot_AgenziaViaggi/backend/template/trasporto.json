@@ -1,4 +1,4 @@
 {
-  "tipo_veicolo": ["bus", "treno", "aereo"],
+  "tipo_veicolo": ["autobus", "treno", "aereo"],
   "luogo_partenza": "verbatim-string"
 }

@@ -5,8 +5,9 @@ Libreria per la gestione del riepilogo dei template
 import json
 import logging
 import requests
+import time
 from typing import Dict, Any, Tuple
-from database import get_db_connection, release_connection
+from .database import get_db_connection, release_connection
 
 logger = logging.getLogger(__name__)
 
@@ -23,30 +24,61 @@ def algoritmoABC(totale_speso: float, fatturato_annuale: float) -> str:
         str: La lettera (A, B o C) che indica il grado di sconto
     """
     try:
+        # Converti i valori Decimal in float
+        totale_speso = float(totale_speso)
+        fatturato_annuale = float(fatturato_annuale)
+        
+        logger.info(f"Calcolo grado sconto per cliente - Totale speso: {totale_speso}€, Fatturato annuale: {fatturato_annuale}€")
+        
         # Preparo i dati per la chiamata a Drools
         payload = {
             "totale_speso": totale_speso,
             "fatturato_annuale": fatturato_annuale
         }
+        logger.debug(f"Payload preparato per Drools: {payload}")
         
         # Chiamata al servizio Drools
+        logger.info("Inizio chiamata al servizio Drools")
+        logger.debug(f"URL Drools: http://localhost:8080/api/calcola-sconto")
+        
+        start_time = time.time()
         response = requests.post(
-            "http://localhost:8080/drools-service/api/calcola-sconto",
+            "http://localhost:8080/api/calcola-sconto",
             json=payload
         )
+        end_time = time.time()
+        
+        logger.debug(f"Tempo di risposta Drools: {end_time - start_time:.2f} secondi")
         
         if response.status_code == 200:
             risultato = response.json()
             grado_sconto = risultato.get("grado_sconto", "C")  # Default a C se non specificato
-            logger.info(f"Grado sconto calcolato: {grado_sconto}")
+            logger.info(f"Risposta Drools ricevuta con successo - Grado sconto: {grado_sconto}")
+            logger.debug(f"Risposta completa Drools: {risultato}")
+            logger.debug(f"Headers risposta: {dict(response.headers)}")
             return grado_sconto
         else:
-            logger.error(f"Errore nella chiamata a Drools: {response.status_code}")
+            logger.error(f"Errore nella chiamata a Drools - Status code: {response.status_code}")
+            logger.error(f"Contenuto risposta: {response.text}")
+            logger.error(f"Headers risposta: {dict(response.headers)}")
             return "C"  # Default a C in caso di errore
             
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"Errore di connessione al servizio Drools: {str(e)}")
+        logger.error("Verificare che il servizio Drools sia in esecuzione su http://localhost:8080")
+        return "C"  # Default a C in caso di errore di connessione
+    except requests.exceptions.Timeout as e:
+        logger.error(f"Timeout nella chiamata al servizio Drools: {str(e)}")
+        logger.error("Il servizio Drools ha impiegato troppo tempo a rispondere")
+        return "C"  # Default a C in caso di timeout
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Errore nella richiesta al servizio Drools: {str(e)}")
+        logger.error(f"URL richiesta: http://localhost:8080/api/calcola-sconto")
+        return "C"  # Default a C in caso di errore nella richiesta
     except Exception as e:
-        logger.error(f"Errore nell'algoritmo ABC: {str(e)}")
-        return "C"  # Default a C in caso di errore
+        logger.error(f"Errore imprevisto nell'algoritmo ABC: {str(e)}")
+        logger.exception("Stack trace completo:")
+        return "C"  # Default a C in caso di errore generico
 
 
 
@@ -176,6 +208,8 @@ def process_riepilogo(stato_conversazione_json: str) -> Dict[str, Any]:
                 logger.info("Elaborazione del template noleggi")
                 risultato = process_noleggi(
                     stato_conversazione['noleggi'],
+                    luogo,
+                    riepilogo_elaborato.get('intro', {}).get('numero_partecipanti', 1),
                     riepilogo_elaborato.get('intro', {}).get('trip_duration', 1),
                     [budget_viaggio] if budget_viaggio else [0]
                 )
@@ -369,17 +403,18 @@ def process_contatti(template_data: Dict[str, Any]) -> str:
         
         try:
             # Verifica se esiste il profilo usando il codice fiscale o partita IVA
-            cursor.execute("SELECT budget_tot_speso FROM clieti WHERE identificativo = %s", (identificativo,))
+            cursor.execute("SELECT budget_tot_speso FROM clienti WHERE identificativo = %s", (identificativo,))
             risultato = cursor.fetchone()
             
             # Query per ottenere il fatturato dell'anno corrente
             cursor.execute("""
-                SELECT COALESCE(SUM(importo), 0) 
+                SELECT importo_annuale 
                 FROM azienda 
-                WHERE identificativo = %s 
-                AND EXTRACT(YEAR FROM data_fattura) = EXTRACT(YEAR FROM CURRENT_DATE)
-            """, (identificativo,))
-            fatturato_annuale = cursor.fetchone()[0]
+                WHERE anno = EXTRACT(YEAR FROM CURRENT_DATE)
+               """)
+            # Recupera il fatturato annuale
+            risultato_fatturato = cursor.fetchone()
+            fatturato_annuale = risultato_fatturato[0] if risultato_fatturato else 0
             
             if risultato:
                 totale_speso = risultato[0]
@@ -394,7 +429,7 @@ def process_contatti(template_data: Dict[str, Any]) -> str:
                 # Inserisci nuovo profilo con tutti i campi necessari
                 cursor.execute(
                     """
-                    INSERT INTO clieti (
+                    INSERT INTO clienti (
                         full_name, 
                         identificativo, 
                         cellulare, 
@@ -419,7 +454,7 @@ def process_contatti(template_data: Dict[str, Any]) -> str:
         logger.error(f"Errore nell'interrogazione del database: {str(e)}")
         return "C"
 
-def process_trasporto(template_data: Dict[str, Any], luogo: str, budget_viaggio: list) -> Dict[str, Any]:
+def process_trasporto(template_data: Dict[str, Any], luogo: str, persone: int, budget_viaggio: list) -> Dict[str, Any]:
     """
     Processa il template trasporto cercando nel database il mezzo di trasporto più adatto
     in base al tipo di veicolo, luogo di partenza, luogo di arrivo e budget disponibile.
@@ -429,6 +464,7 @@ def process_trasporto(template_data: Dict[str, Any], luogo: str, budget_viaggio:
     Args:
         template_data: Dizionario contenente i dati del template trasporto
         luogo: Stringa contenente il luogo di arrivo
+        persone: Numero di persone partecipanti
         budget_viaggio: Lista contenente il budget disponibile per il viaggio [budget]
         
     Returns:
@@ -552,15 +588,16 @@ def process_alloggi(template_data: Dict[str, Any], benessere: Dict[str, Any], lu
         
         try:
             # Inizializza le variabili per il ciclo
-            percentuale_budget = 0.80  # Inizia dall'80%
+            percentuale_budget = 0.40  # Inizia dall'40%
             alloggio_trovato = None
             budget_originale = budget_viaggio[0]
             
-            while percentuale_budget >= 0.15:  # Continua fino al 15%
+            while percentuale_budget <= 0.90:  # Continua fino al 90%
                 # Calcola il budget per questa iterazione
                 budget_attuale = budget_originale * percentuale_budget
+                logger.info(f"Budget attuale per la ricerca: {budget_attuale}")
+                # Calcola il budget per notte
                 budget_per_notte = budget_attuale / (giorni * ((persone - bambini) + (bambini / 2)))
-                
                 logger.info(f"Ricerca alloggio con {percentuale_budget*100}% del budget ({budget_per_notte} per notte)")
                 
                 # Query per trovare l'alloggio
@@ -602,7 +639,7 @@ def process_alloggi(template_data: Dict[str, Any], benessere: Dict[str, Any], lu
                         break
                 
                 # Riduci la percentuale del budget per la prossima iterazione
-                percentuale_budget -= 0.05
+                percentuale_budget += 0.10
             
             # Se non abbiamo trovato un alloggio ottimale, cerca il meno costoso
             if not alloggio_trovato:
@@ -610,14 +647,13 @@ def process_alloggi(template_data: Dict[str, Any], benessere: Dict[str, Any], lu
                 query = """
                     SELECT nome, stelle, benessere, luogo, tipo, costo 
                     FROM alloggi 
-                    WHERE tipo = ANY(%s)
-                    AND benessere = %s
+                    WHERE
                     AND luogo = %s
                     ORDER BY costo ASC
                     LIMIT 1
                 """
                 
-                cursor.execute(query, (tipo_alloggio, ha_benessere, luogo))
+                cursor.execute(query, (luogo))
                 risultato = cursor.fetchone()
                 
                 if risultato:
@@ -656,7 +692,7 @@ def process_alloggi(template_data: Dict[str, Any], benessere: Dict[str, Any], lu
         logger.error(f"Errore nell'interrogazione del database alloggi: {str(e)}")
         return {}
 
-def process_noleggi(template_data: Dict[str, Any], giorni: int, budget_viaggio: list) -> Dict[str, Any]:
+def process_noleggi(template_data: Dict[str, Any], luogo: str, persone: int, giorni:int, budget_viaggio: list) -> Dict[str, Any]:
     """
     Processa il template noleggi cercando nel database il veicolo più adatto
     in base al numero di posti, tipo di cambio e budget disponibile.
@@ -669,19 +705,20 @@ def process_noleggi(template_data: Dict[str, Any], giorni: int, budget_viaggio: 
     
     Args:
         template_data: Dizionario contenente i dati del template noleggi
-        giorni: Numero di giorni di noleggio
+        luogo: Stringa contenente il luogo di destinazione
+        persone: Numero di persone partecipanti
         budget_viaggio: Lista contenente il budget disponibile per il viaggio [budget]
         
     Returns:
         Dict[str, Any]: Dizionario contenente i dettagli dei veicoli noleggiati
     """
     try:
-        n_posti = template_data.get('n_posti')
+        n_posti = template_data.get('posti_auto', persone)  # Usa il numero di persone come fallback
         tipo_cambio = template_data.get('tipo_cambio')
         
         if not n_posti:
-            logger.warning("Numero posti non specificato")
-            return {}
+            logger.warning("Numero posti non specificato, uso il numero di persone come fallback")
+            n_posti = persone
             
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -703,16 +740,14 @@ def process_noleggi(template_data: Dict[str, Any], giorni: int, budget_viaggio: 
                 query = """
                     SELECT nome, marca, n_posti, cambio, costo 
                     FROM veicoli 
-                    WHERE n_posti <= %s
-                    AND costo <= %s
+                    WHERE costo <= %s
+                    ORDER BY ABS(n_posti - %s), costo ASC LIMIT 1
                 """
-                params = [posti_rimanenti, budget_giornaliero]
+                params = [budget_giornaliero, posti_rimanenti]
                 
                 if tipo_cambio:
-                    query += " AND cambio = %s"
-                    params.append(tipo_cambio)
-                
-                query += " ORDER BY n_posti DESC, costo ASC LIMIT 1"
+                    query = query.replace("WHERE costo", "WHERE cambio = %s AND costo")
+                    params.insert(0, tipo_cambio)
                 
                 cursor.execute(query, params)
                 risultato = cursor.fetchone()
@@ -797,8 +832,17 @@ def process_naturalistico(template_data: Dict[str, Any], luogo: str, persone: in
         try:
             attivita_trovate = []
             costo_totale = 0
+
+            # Gestione del formato delle attività:
+            # - Se è una stringa, la convertiamo in lista con un solo elemento
+            # - Se è una lista di liste, prendiamo la prima lista
+            # - Se è già una lista semplice, la usiamo così com'è
+            if isinstance(attivita, str):
+                attivita = [attivita]
+            elif isinstance(attivita, list) and attivita and isinstance(attivita[0], list):
+                attivita = attivita[0]
             
-            for tipo in attivita[0]:  # attivita è una lista di liste
+            for tipo in attivita:  # attivita è una lista di liste
                 # Inizializza le variabili per il ciclo
                 tentativi = 0
                 max_tentativi = 10
@@ -913,12 +957,25 @@ def process_avventura(template_data: Dict[str, Any], luogo: str, persone: int, b
     """
     try:
         attivita = template_data.get('attivita', [])
-        livelli_difficolta = template_data.get('livello_difficoltà', [])
+        livelli_difficolta = template_data.get('livello_difficoltà')
         guida_richiesta = template_data.get('guida_esperta', False)
         lingua_guida = template_data.get('lingua_guida', 'italiano')
         
-        if not attivita or not livelli_difficolta:
-            logger.warning("Attività o livelli di difficoltà non specificati nel template avventura")
+        # Gestione livelli difficoltà
+        if not livelli_difficolta or (isinstance(livelli_difficolta, list) and len(livelli_difficolta) == 0):
+            livelli_difficolta = ['principiante']
+            logger.info("Nessun livello di difficoltà specificato, impostato default a 'principiante'")
+        elif isinstance(livelli_difficolta, str):
+            livelli_difficolta = [livelli_difficolta]
+            logger.info(f"Livello di difficoltà convertito in lista: {livelli_difficolta}")
+        
+        logger.info(f"Inizio processamento avventura per luogo: {luogo}, persone: {persone}, budget: {budget_viaggio[0]}")
+        logger.info(f"Attività richieste: {attivita}")
+        logger.info(f"Livelli difficoltà: {livelli_difficolta}")
+        logger.info(f"Guida richiesta: {guida_richiesta}, lingua: {lingua_guida}")
+        
+        if not attivita:
+            logger.warning("Nessuna attività specificata nel template avventura")
             return {}
             
         conn = get_db_connection()
@@ -927,8 +984,21 @@ def process_avventura(template_data: Dict[str, Any], luogo: str, persone: int, b
         try:
             attivita_trovate = []
             costo_totale = 0
+
+            # Gestione del formato delle attività:
+            # - Se è una stringa, la convertiamo in lista con un solo elemento
+            # - Se è una lista di liste, prendiamo la prima lista
+            # - Se è già una lista semplice, la usiamo così com'è
+            if isinstance(attivita, str):
+                attivita = [attivita]
+                logger.debug(f"Attività convertita da stringa a lista: {attivita}")
+            elif isinstance(attivita, list) and attivita and isinstance(attivita[0], list):
+                attivita = attivita[0]
+                logger.debug(f"Attività estratta dalla lista di liste: {attivita}")
             
-            for tipo in attivita[0]:  # attivita è una lista di liste
+            # Ora attivita è una lista di parole intere
+            for tipo in attivita:  # Iteriamo sulle parole intere
+                logger.info(f"Ricerca attività di tipo: {tipo}")
                 # Inizializza le variabili per il ciclo
                 tentativi = 0
                 max_tentativi = 10
@@ -946,12 +1016,14 @@ def process_avventura(template_data: Dict[str, Any], luogo: str, persone: int, b
                 # Prima prova con selezione casuale
                 while tentativi < max_tentativi:
                     query = query_base + " ORDER BY RANDOM() LIMIT 1"
+                    logger.debug(f"Tentativo {tentativi + 1}: Esecuzione query casuale per {tipo}")
                     cursor.execute(query, (tipo, luogo, livelli_difficolta))
                     risultato = cursor.fetchone()
                     
                     if risultato:
                         nome, tipo, livello, prezzo_persona, luogo = risultato
                         costo_attivita = prezzo_persona * persone
+                        logger.debug(f"Trovata attività: {nome}, costo per persona: {prezzo_persona}, costo totale: {costo_attivita}")
                         
                         if costo_attivita <= budget_viaggio[0]:
                             attivita_trovata = {
@@ -962,13 +1034,17 @@ def process_avventura(template_data: Dict[str, Any], luogo: str, persone: int, b
                                 "luogo": luogo,
                                 "costo_totale": costo_attivita
                             }
+                            logger.info(f"Attività trovata nel budget: {nome} ({tipo})")
                             break
+                        else:
+                            logger.debug(f"Attività {nome} troppo costosa: {costo_attivita} > {budget_viaggio[0]}")
                     
                     tentativi += 1
                 
                 # Se non è stata trovata un'attività nel budget dopo i tentativi casuali,
                 # prova con la più economica
                 if not attivita_trovata:
+                    logger.info(f"Nessuna attività casuale trovata per {tipo}, cerco la più economica")
                     query = query_base + " ORDER BY prezzo_persona ASC LIMIT 1"
                     cursor.execute(query, (tipo, luogo, livelli_difficolta))
                     risultato = cursor.fetchone()
@@ -976,6 +1052,7 @@ def process_avventura(template_data: Dict[str, Any], luogo: str, persone: int, b
                     if risultato:
                         nome, tipo, livello, prezzo_persona, luogo = risultato
                         costo_attivita = prezzo_persona * persone
+                        logger.debug(f"Trovata attività economica: {nome}, costo per persona: {prezzo_persona}, costo totale: {costo_attivita}")
                         
                         if costo_attivita <= budget_viaggio[0]:
                             attivita_trovata = {
@@ -986,15 +1063,18 @@ def process_avventura(template_data: Dict[str, Any], luogo: str, persone: int, b
                                 "luogo": luogo,
                                 "costo_totale": costo_attivita
                             }
+                            logger.info(f"Attività economica trovata nel budget: {nome} ({tipo})")
+                        else:
+                            logger.warning(f"Anche l'attività più economica è troppo costosa: {costo_attivita} > {budget_viaggio[0]}")
                 
                 if attivita_trovata:
                     attivita_trovate.append(attivita_trovata)
                     costo_totale += attivita_trovata["costo_totale"]
                     
-                    logger.info(f"Trovata attività: {tipo} con {attivita_trovata['nome']} a {luogo}")
+                    logger.info(f"Attività aggiunta al riepilogo: {tipo} con {attivita_trovata['nome']} a {luogo}")
                     logger.info(f"Livello: {attivita_trovata['livello_difficolta']}, Prezzo per persona: {attivita_trovata['prezzo_persona']}, Costo totale: {attivita_trovata['costo_totale']}")
                 else:
-                    logger.warning(f"Nessuna attività di tipo {tipo} trovata per {luogo} nel budget disponibile")
+                    logger.warning(f"Nessuna attività di tipo '{tipo}' trovata per {luogo} nel budget {budget_viaggio[0]}")
             
             # Aggiungi il costo della guida se richiesta
             if guida_richiesta:
@@ -1015,6 +1095,7 @@ def process_avventura(template_data: Dict[str, Any], luogo: str, persone: int, b
                 
                 # Decrementa il budget
                 budget_viaggio[0] -= costo_totale
+                logger.info(f"Budget aggiornato: {budget_viaggio[0]}")
                 
                 return risultato
             else:
@@ -1027,6 +1108,7 @@ def process_avventura(template_data: Dict[str, Any], luogo: str, persone: int, b
             
     except Exception as e:
         logger.error(f"Errore nell'interrogazione del database avventure: {str(e)}")
+        logger.exception("Stack trace completo:")
         return {}
 
 def process_montagna(template_data: Dict[str, Any], luogo: str, persone: int, budget_viaggio: list) -> Dict[str, Any]:
@@ -1058,8 +1140,17 @@ def process_montagna(template_data: Dict[str, Any], luogo: str, persone: int, bu
         try:
             attivita_trovate = []
             costo_totale = 0
+
+            # Gestione del formato delle attività:
+            # - Se è una stringa, la convertiamo in lista con un solo elemento
+            # - Se è una lista di liste, prendiamo la prima lista
+            # - Se è già una lista semplice, la usiamo così com'è
+            if isinstance(attivita, str):
+                attivita = [attivita]
+            elif isinstance(attivita, list) and attivita and isinstance(attivita[0], list):
+                attivita = attivita[0]
             
-            for tipo in attivita[0]:  # attivita è una lista di liste
+            for tipo in attivita:  # attivita è una lista di liste
                 # Inizializza le variabili per il ciclo
                 tentativi = 0
                 max_tentativi = 10
@@ -1193,8 +1284,18 @@ def process_mare(template_data: Dict[str, Any], luogo: str, persone: int, budget
         try:
             attivita_trovate = []
             costo_totale = 0
+
+            # Gestione del formato delle attività:
+            # - Se è una stringa, la convertiamo in lista con un solo elemento
+            # - Se è una lista di liste, prendiamo la prima lista
+            # - Se è già una lista semplice, la usiamo così com'è
+            if isinstance(attivita, str):
+                attivita = [attivita]
+            elif isinstance(attivita, list) and attivita and isinstance(attivita[0], list):
+                attivita = attivita[0]
+
             
-            for tipo in attivita[0]:  # attivita è una lista di liste
+            for tipo in attivita:  # attivita è una lista di liste
                 # Inizializza le variabili per il ciclo
                 tentativi = 0
                 max_tentativi = 10
@@ -1328,8 +1429,17 @@ def process_gastronomia(template_data: Dict[str, Any], luogo: str, persone: int,
         try:
             attivita_trovate = []
             costo_totale = 0
+
+            # Gestione del formato delle degustazioni:
+            # - Se è una stringa, la convertiamo in lista con un solo elemento
+            # - Se è una lista di liste, prendiamo la prima lista
+            # - Se è già una lista semplice, la usiamo così com'è
+            if isinstance(degustazioni, str):
+                degustazioni = [degustazioni]
+            elif isinstance(degustazioni, list) and degustazioni and isinstance(degustazioni[0], list):
+                degustazioni = degustazioni[0]
             
-            for tipo in degustazioni[0]:  # degustazioni è una lista di liste
+            for tipo in degustazioni:  # degustazioni è una lista di liste
                 # Inizializza le variabili per il ciclo
                 tentativi = 0
                 max_tentativi = 10
@@ -1465,7 +1575,16 @@ def process_citta_arte(template_data: Dict[str, Any], luogo: str, persone: int, 
             attivita_trovate = []
             costo_totale = 0
             
-            for tipo in attivita[0]:  # attivita è una lista di liste
+            # Gestione del formato delle attività:
+            # - Se è una stringa, la convertiamo in lista con un solo elemento
+            # - Se è una lista di liste, prendiamo la prima lista
+            # - Se è già una lista semplice, la usiamo così com'è
+            if isinstance(attivita, str):
+                attivita = [attivita]
+            elif isinstance(attivita, list) and attivita and isinstance(attivita[0], list):
+                attivita = attivita[0]
+            
+            for tipo in attivita:
                 # Inizializza le variabili per il ciclo
                 tentativi = 0
                 max_tentativi = 10

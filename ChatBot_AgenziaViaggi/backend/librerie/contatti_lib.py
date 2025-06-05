@@ -164,10 +164,10 @@ class ContattiTemplate(BaseTemplate):
                     return False, "Il numero di cellulare deve essere una stringa", corrected_data
                 
                 try:
-                    # Aggiungi il prefisso + se non presente
+                    # Aggiungi il prefisso +39 se non presente il +
                     phone_number = data['numero_cellulare']
                     if not phone_number.startswith('+'):
-                        phone_number = '+' + phone_number
+                        phone_number = '+39' + phone_number
                     
                     # Parsa il numero
                     parsed_number = phonenumbers.parse(phone_number)

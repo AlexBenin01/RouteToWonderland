@@ -8,6 +8,19 @@ import json
 from typing import Dict, Any, Optional, List
 import logging
 import re
+import sys
+
+# Configurazione del logger per supportare UTF-8
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Forza l'encoding UTF-8 per stdout
+sys.stdout.reconfigure(encoding='utf-8')
 
 class OllamaManager:
     def __init__(self, model_name: str = "qwen3:1.7b"):
@@ -105,7 +118,7 @@ Ora, formula la tua domanda:"""
                 # Estrai solo il testo in italiano (dopo l'ultima riga vuota)
                 _text = response_text.split('\n\n')[-1].strip()
                 # Rimuovi le emoji dalla risposta
-                _text = re.sub(r'[^\x00-\x7F]+', '', _text)
+                #_text = re.sub(r'[^\x00-\x7F]+', '', _text)
                 return _text
             else:
                 return f"Errore nella comunicazione con Ollama: {response.status_code}"
@@ -140,6 +153,47 @@ IMPORTANTE:
 - Non deve essere troppo diretta o brusca
 
 Ora, formula la tua domanda:"""
+
+            response = requests.post(
+                f"{self.base_url}/generate",
+                json={
+                    "model": self.model_name,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "top_p": 0.9,
+                        "top_k": 40,
+                        "system": "Sei un assistente di viaggio esperto e cordiale. Rispondi sempre in italiano."
+                    }
+                }
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                response_text = result.get("response", "Mi dispiace, non sono riuscito a generare una risposta appropriata.")
+                # Estrai solo il testo in italiano (dopo l'ultima riga vuota)
+                _text = response_text.split('\n\n')[-1].strip()
+                # Rimuovi le emoji dalla risposta
+                #_text = re.sub(r'[^\x00-\x7F]+', '', _text)
+                return _text
+            else:
+                return f"Errore nella comunicazione con Ollama: {response.status_code}"
+        except Exception as e:
+            return f"Si è verificato un errore: {str(e)}" 
+    
+    def campi_obbligatori(self) -> str:
+        """Restituisce una frase guida per chiedere se concludere la conversazione"""
+        try:
+            prompt = """Sei un assistente di viaggio esperto e cordiale. Il tuo compito è comunicare all'utente che ci sono ancora domande obbligatorie da completare.
+
+IMPORTANTE:
+- La risposta deve essere: "Abbiamo ancora delle domande obbligatorie prima di passare alla fattura di viaggio"
+- La risposta deve essere in italiano
+- Non modificare la frase fornita
+- Non aggiungere altro testo
+
+Ora, formula la tua risposta:"""
 
             response = requests.post(
                 f"{self.base_url}/generate",

@@ -5,4 +5,4 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configurazione del servizio Drools
-DROOLS_SERVICE_URL = os.getenv("DROOLS_SERVICE_URL", "http://localhost:8080/api/preferences/evaluate") 
+DROOLS_SERVICE_URL = os.getenv("DROOLS_SERVICE_URL", "http://localhost:8080") 

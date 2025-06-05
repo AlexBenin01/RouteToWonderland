@@ -21,14 +21,14 @@ class MasterTemplateManager:
             
             # Carica il template master dal file JSON
             with open(template_path, 'r', encoding='utf-8') as f:
-                self.template_master = json.load(f)
+                self.template_master_origin = json.load(f)
                 logger.info("Template master caricato con successo")
                 
             # Inizializza tutti i valori a None
-            for key in self.template_master.keys():
+            for key in self.template_master_origin.keys():
                 self.template_master[key] = None
                 
-            logger.info("Template master inizializzato con valori None")
+            #logger.info("Template master inizializzato con valori None")
             
         except Exception as e:
             logger.error(f"Errore durante il caricamento del template master: {str(e)}")
@@ -41,7 +41,7 @@ class MasterTemplateManager:
         Args:
             template_master: Dizionario contenente il template master
         """
-        self.template_master = template_master
+        self.template_master_origin = template_master
         logger.info("Template master caricato")
     
     def process_extraction(self, text: str) -> Tuple[Dict[str, Any], bool]:
@@ -65,12 +65,9 @@ class MasterTemplateManager:
             self.model_path = './NuExtract-2-2B-experimental'  # Percorso del modello NuExtract
             logger.info(f"Percorso modello: {self.model_path}")
             
-            # Crea un template vuoto con la stessa struttura del template master
-            empty_template = {key: None for key in self.template_master.keys()}
-            logger.info(f"Template vuoto creato: {empty_template}")
             
             # Converti il template vuoto in JSON
-            template_json = json.dumps(empty_template, ensure_ascii=False)
+            template_json = json.dumps(self.template_master_origin, ensure_ascii=False)
             logger.info(f"Template JSON: {template_json}")
             
             # Ottieni i dati estratti

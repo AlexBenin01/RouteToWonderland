@@ -1,5 +1,4 @@
 {   
-    "anziani": "integer",
     "tipo_alloggio":[["hotel","resort","campeggio","villaggio turistico"]],
     "attivita_avventura": [["rafting", "arrampicata", "trekking"]],
     "adulti": "integer",
@@ -17,6 +16,6 @@
     "attivita_naturalistico": [["birdwatching", "safari", "trekking"]],
     "posti_auto": "integer",
     "tipo_cambio": "verbatim-string",
-    "tipo_veicolo": ["bus", "treno", "aereo"],
+    "tipo_veicolo": ["autobus", "treno", "aereo"],
     "luogo_partenza": "verbatim-string"
 }

@@ -1,4 +1,4 @@
-import { createContext, useState } from 'react'
+import { createContext, useState, useEffect } from 'react'
 
 export const StatoConversazioneContext = createContext({
   statoConversazione_context: {},
@@ -6,7 +6,26 @@ export const StatoConversazioneContext = createContext({
 })
 
 export const StatoConversazioneProvider = ({ children }) => {
-  const [statoConversazione_context, setStatoConversazione_context] = useState({});
+  const [statoConversazione_context, setStatoConversazione_context] = useState(() => {
+    // Resetta lo stato all'avvio dell'applicazione
+    console.log('StatoConversazioneProvider - Reset stato iniziale');
+    return {};
+  });
+
+  // Resetta lo stato quando il localStorage viene pulito
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (!localStorage.getItem('chatHistory')) {
+        console.log('StatoConversazioneProvider - Reset stato per pulizia localStorage');
+        setStatoConversazione_context({});
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   console.log('StatoConversazioneProvider - Stato attuale:', statoConversazione_context);
 

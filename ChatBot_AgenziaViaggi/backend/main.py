@@ -62,11 +62,14 @@ CONTESTO_CONVERSAZIONE = {}
 # Contatore per le richieste di uscita
 EXIT_COUNTER = 0
 
+# Lista dei template obbligatori
+TEMPLATE_OBBLIGATORI = ["intro", "contatti", "trasporto"]
+
 # Inizializzazione del TemplateManager e caricamento dei template
 template_manager = TemplateManager()
 template_manager.load_templates()
-template_manager.set_active_template("avventura")
-template_manager.update_template_sequence(["avventura", "contatti","trasporto"])
+template_manager.set_active_template("intro")
+template_manager.update_template_sequence(["intro", "contatti","trasporto"])
 
 ollama_manager = OllamaManager()
 nu_extract = NuExtract()
@@ -108,6 +111,11 @@ class TravelPreferenceRequest(BaseModel):
     trip_duration: int
     mood_vacanza: List[str]
     budget_viaggio: int
+
+def create_empty_template(empty: Dict[str, Any]) -> Dict[str, Any]:
+    template_vuoto = {key: None for key in empty.keys()}
+    logger.info(f"Template vuoto creato: {template_vuoto}")
+    return template_vuoto
 
 def normalize_template_value(value: Any) -> Any:
     """
@@ -207,7 +215,7 @@ async def extract_simple(request: SimpleRequest):
         logger.info(f"Stato attuale: {stato_attuale}")
         
         # Ottieni il template attivo
-        template_attivo = stato_attuale.get(template_manager.active_template, {})
+        template_attivo = stato_attuale.get(template_manager.active_template, create_empty_template(template_manager.get_active_template()))
         logger.info(f"Template attivo corrente: {template_attivo}")
         
         # Ottieni il contesto della conversazione
@@ -219,13 +227,14 @@ async def extract_simple(request: SimpleRequest):
         logging.info(f"testo_completo della conversazione: {testo_completo}")
         # Estrai le informazioni dal testo usando NuExtract
         template_aggiornato = nu_extract.process_extraction(
-            text=request.text, #temporaneo poi testo_completo
+            text=testo_completo, 
             empty_template=template_manager.get_active_template(),
             saved_template=template_attivo
         )
 
         # Aggiorna il template master con le nuove informazioni
         # Processa il template master con NuExtract solo se template_attivo è "intro"
+        
         if template_manager.active_template == "intro":
             master_template = master_template_manager.process_extraction(testo_completo)
 
@@ -279,37 +288,63 @@ async def extract_simple(request: SimpleRequest):
                 empty_template=template_manager.get_exit_template()
             )
             
-            if template_exit is not None or template_exit == 'null':
+            if template_exit is None or template_exit == 'null':
+                logger.info("Imposto template_exit = False")
                 template_exit = False
 
-
-            if template_exit:
-                logger.info("Richiesta di uscita template_exit:True")
-                EXIT_COUNTER = 0  # Reset del contatore se è una richiesta di uscita valida
-                risposta = ollama_manager.get_exit()
-                logger.info(risposta)
-                response = {
+            if template_exit or EXIT_COUNTER >= 1:
+                logger.info("Richiesta di uscita o nessuna modifica per due volte consecutive")
+                if template_manager.active_template in TEMPLATE_OBBLIGATORI:
+                    logger.info("Template obbligatorio, invio risposta personalizzata")
+                    risposta = ollama_manager.campi_obbligatori()
+                    response = {
+                        "guide_phrase": risposta,
+                        "template_usato": template_manager.active_template,
+                        "stato_conversazione": stato_attuale,
+                        "exit": False
+                    }
+                    logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (risposta personalizzata) ===")
+                    return response
+                else:
+                    logger.info("Richiesta di uscita template_exit:True")
+                    EXIT_COUNTER = 0  # Reset del contatore se è una richiesta di uscita valida
+                    risposta = ollama_manager.get_exit()
+                    logger.info(risposta)
+                    response = {
                         "guide_phrase": risposta,
                         "template_usato": template_manager.active_template,
                         "stato_conversazione": stato_attuale,
                         "exit": True
                     }
-                logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
-                return response
+                    logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
+                    return response
             else:
                 EXIT_COUNTER += 1
                 if EXIT_COUNTER >= 2:
-                    logger.info("Raggiunto il limite di tentativi, richiesta di uscita")
-                    risposta = ollama_manager.get_exit()
-                    logger.info(risposta)
-                    response = {
+                    logger.info("Raggiunto il limite di tentativi, verifica se template obbligatorio")
+                    if template_manager.active_template in TEMPLATE_OBBLIGATORI:
+                        logger.info("Template obbligatorio, invio risposta personalizzata")
+                        risposta = ollama_manager.campi_obbligatori()
+                        response = {
+                            "guide_phrase": risposta,
+                            "template_usato": template_manager.active_template,
+                            "stato_conversazione": stato_attuale,
+                            "exit": False
+                        }
+                        logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (risposta personalizzata) ===")
+                        return response
+                    else:
+                        logger.info("Richiesta di uscita")
+                        risposta = ollama_manager.get_exit()
+                        logger.info(risposta)
+                        response = {
                             "guide_phrase": risposta,
                             "template_usato": template_manager.active_template,
                             "stato_conversazione": stato_attuale,
                             "exit": True
                         }
-                    logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
-                    return response
+                        logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
+                        return response
                 else:
                     logger.info(f"Tentativo {EXIT_COUNTER} di 2, continuo con la conversazione")
                     risposta = ollama_manager.get_response(
@@ -327,6 +362,11 @@ async def extract_simple(request: SimpleRequest):
 
         EXIT_COUNTER = 0  # Reset del contatore se ci sono state modifiche al template
         # Ottieni l'istanza del template corrente
+        logger.info("Aggiornamento stato conversazione")
+        stato_attuale[template_manager.active_template] = template_aggiornato
+        STATO_CONVERSAZIONE_JSON = json.dumps(stato_attuale, ensure_ascii=False)
+        logger.info(f"Stato aggiornato per il template {template_manager.active_template}")
+        logger.info(f"Stato completo: {STATO_CONVERSAZIONE_JSON}")
         current_template = templates.get(template_manager.active_template)
         if current_template:
             logger.info(f"Tipo di current_template: {type(current_template)}")
@@ -460,6 +500,17 @@ async def extract_simple(request: SimpleRequest):
                     }
                     logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
                     return response
+            else:
+                logger.info("Non ci sono più template nella sequenza")
+                riepilogo = await get_summary()
+                return {
+                    "guide_phrase": "Hai completato tutti i template disponibili. Ecco il riepilogo completo:",
+                    "template_usato": template_manager.active_template,
+                    "stato_conversazione": stato_attuale,
+                    "nuovo_template": False,
+                    "exit": False,
+                    "riepilogo": riepilogo
+                }
         
         # Ottieni la risposta da Ollama
         try:
@@ -526,7 +577,7 @@ async def evaluate_preferences(request: TravelPreferenceRequest):
         preference_json = request.dict()
         
         # Chiama il servizio Drools per ottenere i template attivi
-        active_templates = await DroolsService.evaluate_preferences(preference_json)
+        active_templates = await drools_service.evaluate_Templates(preference_json)
         logger.info(f"Template attivi ottenuti da Drools: {active_templates}")
         
         # Crea una nuova sequenza di template basata sui template attivi
@@ -651,12 +702,14 @@ async def skip_template():
             return response
         else:
             logger.info("Non ci sono più template nella sequenza")
+            riepilogo = await get_summary()
             return {
-                "guide_phrase": "Hai completato tutti i template disponibili.",
+                "guide_phrase": "Hai completato tutti i template disponibili. Ecco il riepilogo completo:",
                 "template_usato": template_manager.active_template,
                 "stato_conversazione": stato_attuale,
                 "nuovo_template": False,
-                "exit": False
+                "exit": False,
+                "riepilogo": riepilogo
             }
             
     except Exception as e:
@@ -747,12 +800,36 @@ async def get_summary():
             
             logger.info(f"Template {template_name} completato e aggiunto al riepilogo")
         
+        logger.info(f"Stato aggiornato per il riepilogo: {json.dumps(stato_attuale, ensure_ascii=False, indent=2)}")
+        
         # Processa il riepilogo completo
         riepilogo_elaborato = process_riepilogo(json.dumps(stato_attuale))
         logger.info("Riepilogo elaborato con successo")
         
+        # Pulisci i dati rimuovendo le chiavi con valori vuoti
+        def clean_empty_dicts(data):
+            if isinstance(data, dict):
+                return {
+                    k: clean_empty_dicts(v)
+                    for k, v in data.items()
+                    if v != {} and v is not None
+                }
+            elif isinstance(data, list):
+                return [clean_empty_dicts(item) for item in data if item != {} and item is not None]
+            return data
+        
+        riepilogo_pulito = clean_empty_dicts(riepilogo_elaborato)
+        logger.info("Riepilogo pulito dai dati vuoti")
+        logger.info(f"Riepilogo finale: {json.dumps(riepilogo_pulito, ensure_ascii=False, indent=2)}")
+        
+        # Prepara la risposta con il riepilogo e la flag
+        response = {
+            "data": riepilogo_pulito,
+            "show_summary": True  # flag per indicare che deve essere mostrato nella pagina riepilogo
+        }
+        
         logger.info("=== FINE RICHIESTA GET_SUMMARY ===")
-        return riepilogo_elaborato
+        return response
         
     except Exception as e:
         logger.error(f"Errore in get_summary: {str(e)}", exc_info=True)
