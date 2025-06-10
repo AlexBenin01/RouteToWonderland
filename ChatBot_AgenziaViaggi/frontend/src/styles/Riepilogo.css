@@ -1,0 +1,1197 @@
+.riepilogo-container {
+  min-height: 80vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  padding: 1.5rem 0;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.riepilogo-content {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 15px 35px -12px rgba(0, 0, 0, 0.2);
+  padding: 1.5rem;
+  margin: 0 auto 1.5rem;
+  position: relative;
+  overflow: hidden;
+  max-width: 900px;
+}
+
+.riepilogo-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, 
+    transparent 0%, 
+    rgba(251, 191, 36, 0.05) 50%, 
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.riepilogo-content:hover::before {
+  transform: translateX(100%);
+}
+
+.riepilogo-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
+  letter-spacing: 0.02em;
+}
+
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  color: #fbbf24;
+  margin-bottom: 1.25rem;
+  position: relative;
+  padding-bottom: 0.5rem;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    #fbbf24 50%, 
+    transparent 100%
+  );
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  text-align: center;
+}
+
+.info-item {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1.25rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+}
+
+.info-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  border-color: rgba(251, 191, 36, 0.2);
+}
+
+.info-label {
+  font-size: 0.85rem;
+  color: #fbbf24;
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 1.1rem;
+  color: #ffffff;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.location-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.location-separator {
+  color: #fbbf24;
+  margin: 0 0.5rem;
+}
+
+.date-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-icon {
+  color: #fbbf24;
+  font-size: 1.2rem;
+}
+
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.contact-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.contact-icon {
+  color: #fbbf24;
+  font-size: 1.2rem;
+}
+
+.transport-info {
+  display: grid;
+  gap: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.transport-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.transport-row:last-child {
+  grid-template-columns: 1fr;
+  justify-content: center;
+}
+
+.transport-row:not(:last-child) {
+  border-bottom: 1px solid rgba(251, 191, 36, 0.2);
+  padding-bottom: 1.5rem;
+}
+
+.transport-info .info-item {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.transport-info .info-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.transport-info .info-label {
+  font-size: 0.9rem;
+  color: #fbbf24;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.transport-info .info-value {
+  font-size: 1.2rem;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.riepilogo-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background-color: #3b82f6;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.riepilogo-button:hover {
+  background-color: #2563eb;
+}
+
+.riepilogo-button.bg-green-600 {
+  background-color: #16a34a;
+  margin-top: 20px;
+}
+
+.riepilogo-button.bg-green-600:hover {
+  background-color: #15803d;
+}
+
+.riepilogo-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.riepilogo-table th {
+  padding: 1rem 2rem;
+  text-align: left;
+  font-family: 'Playfair Display', serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.riepilogo-table td {
+  padding: 1.5rem 2rem;
+  color: #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.riepilogo-table tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transition: background-color 0.2s ease;
+}
+
+/* Stili specifici per le categorie */
+.category-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  color: #fbbf24;
+  margin: 2rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid rgba(251, 191, 36, 0.3);
+}
+
+.field-label {
+  font-weight: 500;
+  color: #fbbf24;
+  margin-right: 0.5rem;
+}
+
+.field-value {
+  color: #e2e8f0;
+}
+
+.cost-column {
+  text-align: right;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+/* Stili per il layout a tre colonne */
+.three-column-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* Stili per il layout a due colonne */
+.two-column-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.riepilogo-empty-state {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.riepilogo-empty-state h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.875rem;
+  color: #ffffff;
+  margin-bottom: 1rem;
+}
+
+.riepilogo-empty-state p {
+  color: #cbd5e1;
+  margin-bottom: 1.5rem;
+}
+
+/* Animazioni */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.riepilogo-content {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Stili speciali per il Riepilogo Costi */
+.riepilogo-costi-container {
+  position: relative;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 1rem;
+  padding: 2rem;
+  overflow: hidden;
+  margin: 0 auto 2rem;
+  max-width: 700px;
+}
+
+.riepilogo-costi-container::before,
+.riepilogo-costi-container::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(251, 191, 36, 0.8) 50%, 
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+.riepilogo-costi-container::before {
+  top: 0;
+}
+
+.riepilogo-costi-container::after {
+  bottom: 0;
+  animation-delay: 1s;
+}
+
+.costi-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  color: #fbbf24;
+  margin-bottom: 2rem;
+  text-align: center;
+  position: relative;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+  width: 100%;
+}
+
+.costi-title::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 3px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    #fbbf24 50%, 
+    transparent 100%
+  );
+}
+
+.costi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  position: relative;
+}
+
+.costi-main-section {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2rem;
+  border-radius: 1rem;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.costi-main-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, 
+    transparent 0%, 
+    rgba(251, 191, 36, 0.1) 50%, 
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.costi-main-section:hover::before {
+  transform: translateX(100%);
+}
+
+.price-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.original-price {
+  font-size: 1.5rem;
+  color: #94a3b8;
+  text-decoration: line-through;
+  position: relative;
+}
+
+.discount-badge {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.final-price {
+  font-size: 2.5rem;
+  color: #ffffff;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+}
+
+.budget-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(251, 191, 36, 0.2);
+  width: 100%;
+}
+
+.budget-item {
+  text-align: center;
+  min-width: 200px;
+}
+
+.budget-label {
+  font-size: 0.9rem;
+  color: #fbbf24;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.budget-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.budget-value.initial {
+  color: #94a3b8;
+}
+
+.budget-value.remaining {
+  color: #90ee90;
+  font-weight: 600;
+}
+
+.budget-value.negative {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(251, 191, 36, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+  }
+}
+
+/* Stili per la sezione Avventura */
+.adventure-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.adventure-card {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
+  text-align: center;
+  margin-bottom: 1.25rem;
+  width: 85%;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.adventure-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  pointer-events: none;
+}
+
+.adventure-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.adventure-card:hover::after {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.adventure-name {
+  font-size: 1.25rem;
+  color: #ffffff;
+  margin-bottom: 1.25rem;
+  font-weight: 500;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  letter-spacing: 0.02em;
+}
+
+.adventure-details {
+  display: grid;
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.adventure-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.4rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.4rem;
+  border: 1px solid rgba(251, 191, 36, 0.05);
+}
+
+.adventure-detail:last-child {
+  margin-bottom: 0;
+}
+
+.adventure-label {
+  color: #fbbf24;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.adventure-value {
+  color: #ffffff;
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.adventure-cost {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(251, 191, 36, 0.2);
+  text-align: right;
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+/* Stili per la sezione Template */
+.template-section {
+  text-align: center;
+}
+
+.template-badge {
+  display: inline-block;
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  padding: 0.5rem 1.5rem;
+  border-radius: 2rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin: 1rem 0;
+  transition: all 0.3s ease;
+}
+
+.template-badge:hover {
+  transform: scale(1.05);
+  background: rgba(251, 191, 36, 0.3);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+}
+
+/* Stili per Alloggi */
+.accommodation-card {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
+  text-align: center;
+  margin-bottom: 1.25rem;
+  width: 85%;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.accommodation-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  pointer-events: none;
+}
+
+.accommodation-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.accommodation-card:hover::after {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.accommodation-name {
+  font-size: 1.25rem;
+  color: #ffffff;
+  margin-bottom: 1.25rem;
+  font-weight: 500;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  letter-spacing: 0.02em;
+}
+
+.accommodation-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.accommodation-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.4rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.4rem;
+  border: 1px solid rgba(251, 191, 36, 0.05);
+}
+
+.accommodation-detail:last-child {
+  margin-bottom: 0;
+}
+
+.accommodation-label {
+  color: #fbbf24;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.accommodation-value {
+  color: #ffffff;
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.accommodation-cost {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(251, 191, 36, 0.2);
+  text-align: center;
+}
+
+.accommodation-total {
+  color: #fbbf24;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+/* Stili per Noleggi */
+.rental-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.rental-card {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
+  text-align: center;
+  margin-bottom: 1.25rem;
+  width: 85%;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.rental-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  pointer-events: none;
+}
+
+.rental-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.rental-card:hover::after {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.rental-name {
+  font-size: 1.25rem;
+  color: #ffffff;
+  margin-bottom: 1.25rem;
+  font-weight: 500;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  letter-spacing: 0.02em;
+}
+
+.rental-details {
+  display: grid;
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.rental-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.4rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.4rem;
+  border: 1px solid rgba(251, 191, 36, 0.05);
+}
+
+.rental-detail:last-child {
+  margin-bottom: 0;
+}
+
+.rental-label {
+  color: #fbbf24;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.rental-value {
+  color: #ffffff;
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.rental-summary {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: rgba(251, 191, 36, 0.04);
+  border-radius: 0.6rem;
+  text-align: center;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+}
+
+.rental-summary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  pointer-events: none;
+}
+
+.corsi-cucina-card {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(251, 191, 36, 0.05));
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  margin-top: 1rem;
+}
+
+.corsi-cucina-card .rental-name {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.corsi-cucina-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* Stile uniforme per tutte le sezioni */
+.riepilogo-content {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  color: #fbbf24;
+  margin-bottom: 1.5rem;
+  position: relative;
+  padding-bottom: 0.5rem;
+  text-align: center;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    #fbbf24 50%, 
+    transparent 100%
+  );
+}
+
+/* Stile uniforme per le card delle sezioni */
+.rental-card, .adventure-card, .accommodation-card, .gastronomy-card {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
+  text-align: center;
+  margin: 0 auto 1.5rem;
+  width: 90%;
+  max-width: 800px;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.rental-card::after, .adventure-card::after, .accommodation-card::after, .gastronomy-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  pointer-events: none;
+}
+
+.rental-card:hover, .adventure-card:hover, .accommodation-card:hover, .gastronomy-card:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.rental-card:hover::after, .adventure-card:hover::after, .accommodation-card:hover::after, .gastronomy-card:hover::after {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.rental-name, .adventure-name, .accommodation-name, .gastronomy-name {
+  font-size: 1.25rem;
+  color: #ffffff;
+  margin-bottom: 1.25rem;
+  font-weight: 500;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  letter-spacing: 0.02em;
+}
+
+.rental-details, .adventure-details, .accommodation-details, .gastronomy-details {
+  display: grid;
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.rental-detail, .adventure-detail, .accommodation-detail, .gastronomy-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.4rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.4rem;
+  border: 1px solid rgba(251, 191, 36, 0.05);
+}
+
+.rental-detail:last-child, .adventure-detail:last-child, .accommodation-detail:last-child, .gastronomy-detail:last-child {
+  margin-bottom: 0;
+}
+
+.rental-label, .adventure-label, .accommodation-label, .gastronomy-label {
+  color: #fbbf24;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.rental-value, .adventure-value, .accommodation-value, .gastronomy-value {
+  color: #ffffff;
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.rental-summary, .adventure-summary, .accommodation-summary, .gastronomy-summary {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: rgba(251, 191, 36, 0.04);
+  border-radius: 0.6rem;
+  text-align: center;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+}
+
+.rental-summary::after, .adventure-summary::after, .accommodation-summary::after, .gastronomy-summary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  pointer-events: none;
+}
+
+.rental-summary-item, .adventure-summary-item, .accommodation-summary-item, .gastronomy-summary-item {
+  margin: 0.5rem 0;
+  color: #fbbf24;
+  font-weight: 500;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+/* Stili per la sezione Gastronomia */
+.gastronomy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.gastronomy-card {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  width: 90%;
+  max-width: 700px;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.gastronomy-name {
+  font-size: 1.25rem;
+  color: #ffffff;
+  margin-bottom: 1.25rem;
+  font-weight: 500;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  letter-spacing: 0.02em;
+}
+
+.gastronomy-details {
+  display: grid;
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.gastronomy-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.4rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.4rem;
+  border: 1px solid rgba(251, 191, 36, 0.05);
+}
+
+.gastronomy-label {
+  color: #fbbf24;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.gastronomy-value {
+  color: #ffffff;
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.gastronomy-summary {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: rgba(251, 191, 36, 0.04);
+  border-radius: 0.6rem;
+  text-align: center;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+}
+
+.gastronomy-summary-item {
+  margin: 0.5rem 0;
+  color: #fbbf24;
+  font-weight: 500;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+/* Stili per il layout delle sezioni */
+.section-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.section-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin: 0 auto;
+  max-width: 700px;
+}
+
+/* Stili per il Riepilogo Gastronomia */
+.riepilogo-gastronomia {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 15px 35px -12px rgba(0, 0, 0, 0.2);
+  padding: 1.5rem;
+  margin: 0 auto 1.5rem;
+  position: relative;
+  overflow: hidden;
+  max-width: 900px;
+}
+
+.riepilogo-gastronomia-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  color: #fbbf24;
+  margin-bottom: 1.5rem;
+  position: relative;
+  padding-bottom: 0.5rem;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.riepilogo-gastronomia-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    #fbbf24 50%, 
+    transparent 100%
+  );
+}
+
+.gastronomy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.gastronomy-card {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  width: 90%;
+  max-width: 700px;
+  border: 1px solid rgba(251, 191, 36, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+} 

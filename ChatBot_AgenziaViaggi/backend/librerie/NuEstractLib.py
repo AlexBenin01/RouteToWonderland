@@ -51,10 +51,22 @@ class NuExtract:
                 print(f"\nConfronto per chiave '{key}':")
                 print(f"Valore estratto: {value} (tipo: {type(value)})")
                 print(f"Valore nel template: {template_aggiornato.get(key)} (tipo: {type(template_aggiornato.get(key))})")
-                # Aggiorna solo se:
-                # 1. È una lista non vuota, O
-                # 2. Non è una lista e non è null
-                if (isinstance(value, list) and len(value) > 0) or (not isinstance(value, list) and value is not None and value != "null"):
+                
+                # Se il valore è una lista
+                if isinstance(value, list):
+                    # Se la chiave esiste già nel template e contiene una lista
+                    if key in template_aggiornato and isinstance(template_aggiornato[key], list):
+                        # Aggiungi solo gli elementi che non sono già presenti
+                        for item in value:
+                            if item not in template_aggiornato[key]:
+                                template_aggiornato[key].append(item)
+                                print(f"AGGIUNGO elemento alla lista {key}: {item}")
+                    # Se la chiave non esiste o non contiene una lista, sostituisci con la nuova lista
+                    elif value:  # solo se la lista non è vuota
+                        print(f"AGGIORNO: {key} da {template_aggiornato.get(key)} a {value}")
+                        template_aggiornato[key] = value
+                # Per valori non-lista, aggiorna solo se non è null
+                elif value is not None and value != "null":
                     print(f"AGGIORNO: {key} da {template_aggiornato.get(key)} a {value}")
                     template_aggiornato[key] = value
                 else:

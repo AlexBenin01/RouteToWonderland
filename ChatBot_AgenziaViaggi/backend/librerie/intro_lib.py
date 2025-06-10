@@ -7,13 +7,13 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection, release_connection
 
 
 
@@ -64,14 +64,7 @@ class IntroTemplate(BaseTemplate):
             print(f"Verifica destinazione generica per: {data['nazione_destinazione']}")
             
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
-            print("Connessione al database stabilita con successo")
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             try:
@@ -150,14 +143,7 @@ class IntroTemplate(BaseTemplate):
             print(f"Verifica destinazione locale per: {data['regione_citta_destinazione']}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
-            print("Connessione al database stabilita con successo")
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             try:
@@ -259,14 +245,7 @@ class IntroTemplate(BaseTemplate):
             print(f"Verifica mood della vacanza per: {mood_list}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
-            print("Connessione al database stabilita con successo")
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             mood_corretti = []
@@ -298,10 +277,10 @@ class IntroTemplate(BaseTemplate):
                             mood_corretti.append(tag_corretto)
                         else:
                             print(f"Mood '{mood}' non ha corrispondenze sufficientemente simili")
-                            mood_corretti.append(mood)
+                            
                     else:
                         print(f"Nessun risultato trovato per il mood '{mood}'")
-                        mood_corretti.append(mood)
+                        
 
                 except Exception as e:
                     print(f"Errore durante la generazione dell'embedding per '{mood}': {str(e)}")
@@ -345,7 +324,7 @@ class IntroTemplate(BaseTemplate):
             print(f"Verifica tipo partecipanti per: {tipo}")
 
             # Lista di tipi validi
-            tipi_validi = ["adulti", "anziani", "famiglia"]
+            tipi_validi = ["adulti", "famiglia"]
             
             try:
                 print(f"Generazione embedding per tipo: '{tipo}'")
@@ -369,7 +348,8 @@ class IntroTemplate(BaseTemplate):
                     data['tipo_partecipanti'] = tipi_validi[indice_min]
                 else:
                     print(f"Tipo '{tipo}' non ha corrispondenze sufficientemente simili")
-                    data['tipo_partecipanti'] = tipo
+                    data['tipo_partecipanti'] = None
+                    
 
             except Exception as e:
                 print(f"Errore durante la generazione dell'embedding per '{tipo}': {str(e)}")
@@ -397,13 +377,7 @@ class IntroTemplate(BaseTemplate):
             str: La nazione trovata o None se non trovata
         """
         try:
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             cursor = conn.cursor()
             
             # Prima prova a cercare nella tabella destinazioni_locali
@@ -486,7 +460,7 @@ class IntroTemplate(BaseTemplate):
                 if not isinstance(corrected_data['numero_partecipanti'], int):
                     errors.append("Il numero di partecipanti deve essere un intero")
                 elif corrected_data['numero_partecipanti'] <= 0:
-                    errors.append("Il numero di partecipanti deve essere maggiore di zero")
+                    corrected_data['numero_partecipanti'] = -(corrected_data['numero_partecipanti'])
             
             # Validazione tipo_partecipanti
             if 'tipo_partecipanti' in data and data['tipo_partecipanti']:
@@ -509,7 +483,7 @@ class IntroTemplate(BaseTemplate):
                 if not isinstance(corrected_data['trip_duration'], int):
                     errors.append("La durata del viaggio deve essere un intero")
                 elif corrected_data['trip_duration'] <= 0:
-                    corrected_data['trip_duration'] = None
+                    corrected_data['trip_duration'] = -(corrected_data['trip_duration'])
                     errors.append("La durata del viaggio deve essere maggiore di zero")
             
             # Validazione budget_viaggio
@@ -517,7 +491,7 @@ class IntroTemplate(BaseTemplate):
                 if not isinstance(corrected_data['budget_viaggio'], int):
                     errors.append("Il budget del viaggio deve essere un intero")
                 elif corrected_data['budget_viaggio'] < 0:
-                    corrected_data['budget_viaggio']=None
+                    corrected_data['budget_viaggio']= -(corrected_data['budget_viaggio'])
                     errors.append("Il budget del viaggio non può essere negativo")
 
             

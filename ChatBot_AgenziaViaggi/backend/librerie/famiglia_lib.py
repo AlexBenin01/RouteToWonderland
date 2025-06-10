@@ -13,7 +13,6 @@ from .base_template import BaseTemplate
 class FamigliaTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
         super().__init__(template_manager)
-        self.template_name = "famiglia"
     
     def _load_template(self) -> Dict[str, Any]:
         """Carica il template JSON"""
@@ -51,7 +50,7 @@ class FamigliaTemplate(BaseTemplate):
                 print(f"[DEBUG] Validazione adulti: {data['adulti']}")
                 if not isinstance(data['adulti'], int) or data['adulti'] < 0:
                     print(f"[ERROR] adulti non valido: {data['adulti']}")
-                    corrected_data.pop('adulti', None)
+                    corrected_data['adulti'] = -(corrected_data['adulti'])
                 else:
                     print(f"[DEBUG] adulti validato con successo: {data['adulti']}")
 
@@ -60,7 +59,7 @@ class FamigliaTemplate(BaseTemplate):
                 print(f"[DEBUG] Validazione bambini: {data['bambini']}")
                 if not isinstance(data['bambini'], int) or data['bambini'] < 0:
                     print(f"[ERROR] bambini non valido: {data['bambini']}")
-                    corrected_data.pop('bambini', None)
+                    corrected_data['bambini'] = -(corrected_data['bambini'])
                 else:
                     print(f"[DEBUG] bambini validato con successo: {data['bambini']}")
             

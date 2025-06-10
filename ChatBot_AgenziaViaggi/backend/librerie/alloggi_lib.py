@@ -5,22 +5,18 @@ Gestisce le preferenze e i requisiti per l'alloggio
 
 import json
 from typing import Dict, Any, Tuple, List
-from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection, release_connection
 
 class AlloggiTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
         super().__init__(template_manager)
-        self.template_name = "alloggi"
-        self.template_path = f"template/{self.template_name}.json"
-        self.template_data = self._load_template()
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
     
@@ -59,15 +55,7 @@ class AlloggiTemplate(BaseTemplate):
 
             print(f"Verifica tipo alloggio: {data['tipo_alloggio']}")
             
-            print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
-            print("Connessione al database stabilita con successo")
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             try:
@@ -86,9 +74,9 @@ class AlloggiTemplate(BaseTemplate):
 
             print("Esecuzione query per trovare il tipo di alloggio più simile...")
             cursor.execute("""
-                SELECT alloggi, embedding_tipo_alloggio <=> %s::vector as distanza
-                FROM tipo_alloggio
-                WHERE embedding_tipo_alloggio IS NOT NULL
+                SELECT alloggi, embedding_tipo_alloggi <=> %s::vector as distanza
+                FROM tipo_alloggi
+                WHERE embedding_tipo_alloggi IS NOT NULL
                 ORDER BY distanza ASC
                 LIMIT 1
             """, (tipo_alloggio_embedding,))

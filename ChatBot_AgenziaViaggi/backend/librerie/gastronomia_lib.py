@@ -7,18 +7,20 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection, release_connection
 
 
 class GastronomiaTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
         super().__init__(template_manager)
+        self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
+        self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
 
 
     def validate_degustazione(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
@@ -32,79 +34,78 @@ class GastronomiaTemplate(BaseTemplate):
         Returns:
             Tuple[bool, str, Dict[str, Any]]: (validità dei dati, messaggio di errore, dati corretti)
         """
-        try:
-            if 'degustazione' not in data or not data['degustazione']:
-                print("Tipo degustazione mancante o vuoto")
-                return False, "Il tipo di degustazione è obbligatorio", data
 
-            print(f"Verifica tipo degustazione: {data['degustazione']}")
-            
+        corrected_data = {}
+        try:
+            if 'degustazioni' not in data or not data['degustazioni']:
+                return True, "Le degustazioni sono opzionali", data
+
+            # Converti in lista se è una stringa singola
+            degustazione_list = data['degustazioni'] if isinstance(data['degustazioni'], list) else [data['degustazioni']]
+            print(f"Verifica degustazioni per: {degustazione_list}")
+
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
-            try:
-                print("Generazione embedding per il tipo di degustazione...")
-                print(f"Testo da convertire in embedding: '{data['degustazione']}'")
-                degustazione_embedding = self.model.encode(data['degustazione'])
-                print(f"Embedding generato con successo, dimensione: {len(degustazione_embedding)}")
-                degustazione_embedding = degustazione_embedding.tolist()
-            except Exception as e:
-                print(f"Errore durante la generazione dell'embedding: {str(e)}")
-                print(f"Tipo di errore: {type(e)}")
-                import traceback
-                print("Stack trace:")
-                print(traceback.format_exc())
-                raise
+            degustazione_corrette = []
+            for degustazione in degustazione_list:
+                try:
+                    print(f"Generazione embedding per attività: '{degustazione}'")
+                    degustazione_embedding = self.model.encode(degustazione)
+                    print(f"Embedding generato con successo, dimensione: {len(degustazione_embedding)}")
+                    # Converti l'array NumPy in lista
+                    degustazione_embedding = degustazione_embedding.tolist()
 
-            print("Esecuzione query per trovare il tipo di degustazione più simile...")
-            cursor.execute("""
-                SELECT degustazione, embedding_degustazione <=> %s::vector as distanza
-                FROM degustazione
-                WHERE embedding_degustazione IS NOT NULL
-                ORDER BY distanza ASC
-                LIMIT 1
-            """, (degustazione_embedding,))
-            
-            risultato = cursor.fetchall()
-            print(f"Risultato query: {risultato}")
-            
-            if risultato:
-                tipo_degustazione_corretto, distanza = risultato[0]
-                print(f"Distanza trovata: {distanza}")
-                if distanza > 0.4:
-                    print(f"Distanza troppo grande ({distanza} > 0.4), rimuovo il valore")
-                    data['degustazione'] = None
-                    return False, "Nessun tipo di degustazione simile trovato nel database", data
-                
-                print(f"Aggiornamento tipo degustazione da '{data['degustazione']}' a '{tipo_degustazione_corretto}'")
-                data['degustazione'] = tipo_degustazione_corretto
-                return True, "Tipo di degustazione verificato e corretto", data
-            else:
-                print("Nessun risultato trovato nel database, rimuovo il valore")
-                data['degustazione'] = None
-                return False, "Nessun tipo di degustazione trovato nel database", data
+                    print("Esecuzione query per trovare il tipo di degustazione più simile...")
+                    cursor.execute("""
+                        SELECT degustazione, embedding_degustazione <=> %s::vector as distanza
+                        FROM degustazione
+                        WHERE embedding_degustazione IS NOT NULL
+                        ORDER BY distanza ASC
+                        LIMIT 1
+                    """, (degustazione_embedding,))
+                    
+                    risultato = cursor.fetchall()
+                    print(f"Risultato query: {risultato}")
+
+                    if risultato:
+                        degustazione_corretta, distanza = risultato[0]
+                        print(f"Distanza trovata: {distanza}")
+                        if distanza < 0.4:
+                            print(f"Aggiornamento degustazione da '{data['degustazioni']}' a '{degustazione_corretta}'")
+                            degustazione_corrette.append(degustazione_corretta)
+                        else:
+                            print(f"Degustazione '{degustazione}' non ha corrispondenze sufficientemente simili")
+                            degustazione_corrette.append(None)
+                    else:
+                        print(f"Nessun risultato trovato per la degustazione '{degustazione}'")
+                        degustazione_corrette.append(None)
+
+                except Exception as e:
+                    print(f"Errore durante la generazione dell'embedding per '{degustazione}': {str(e)}")
+                    print(f"Tipo di errore: {type(e)}")
+                    import traceback
+                    print("Stack trace:")
+                    print(traceback.format_exc())
+                    degustazione_corrette.append(None)
+
+            # Rimuovi i None dalla lista
+            degustazione_corrette = [a for a in degustazione_corrette if a is not None]
+            corrected_data['degustazioni'] = degustazione_corrette if degustazione_corrette else None
+            print(f"Degustazioni finali: {degustazione_corrette}")
+            return True, "Degustazioni verificate", corrected_data
 
         except Exception as e:
-            print(f"Errore durante la verifica del tipo di degustazione: {str(e)}")
-            import traceback
-            print("Stack trace:")
-            print(traceback.format_exc())
-            return False, f"Errore durante la verifica del tipo di degustazione: {str(e)}", data
+            print(f"Errore durante la verifica delle degustazioni: {str(e)}")
+            return False, f"Errore durante la verifica delle degustazioni: {str(e)}", corrected_data
         finally:
             if 'cursor' in locals():
-                print("Chiusura cursor")
                 cursor.close()
             if 'conn' in locals():
-                print("Chiusura connessione")
                 conn.close()
+            
     
     def validate_data(self, data: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Any]]:
         """
@@ -127,18 +128,21 @@ class GastronomiaTemplate(BaseTemplate):
                 print(f"[DEBUG] Validazione corsi_cucina: {data['corsi_cucina']}")
                 if not isinstance(data['corsi_cucina'], bool):
                     print(f"[ERROR] corsi_cucina non è un booleano: {data['corsi_cucina']}")
-                    corrected_data['corsi_cucina'] = False
+                    corrected_data['corsi_cucina'] = None
                     return False, "Il campo corsi_cucina deve essere un booleano (true/false)", corrected_data
                 print(f"[DEBUG] corsi_cucina valido: {data['corsi_cucina']}")
+                corrected_data['corsi_cucina'] = data['corsi_cucina']
 
-            # Validazione degustazione usando validate_degustazione
-            if 'degustazione' in data:
-                print(f"[DEBUG] Validazione degustazione: {data['degustazione']}")
-                is_valid, error_msg, corrected_data = self.validate_degustazione(corrected_data)
+            # Validazione degustazioni usando validate_degustazione
+            if 'degustazioni' in data:
+                print(f"[DEBUG] Validazione degustazioni: {data['degustazioni']}")
+                is_valid, error_msg, updated_data = self.validate_degustazione(corrected_data)
                 if not is_valid:
-                    print(f"[ERROR] Validazione degustazione fallita: {error_msg}")
+                    print(f"[ERROR] Validazione degustazioni fallita: {error_msg}")
                     return False, error_msg, corrected_data
-                print(f"[DEBUG] degustazione validata con successo: {corrected_data['degustazione']}")
+                # Aggiorna solo il campo degustazioni
+                corrected_data['degustazioni'] = updated_data.get('degustazioni')
+                print(f"[DEBUG] degustazioni validata con successo: {corrected_data['degustazioni']}")
 
             print("[DEBUG] Validazione completata con successo")
             print(f"[DEBUG] Dati corretti: {corrected_data}")

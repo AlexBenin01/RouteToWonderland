@@ -7,13 +7,13 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection
 
 class TrasportoTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
@@ -57,13 +57,7 @@ class TrasportoTemplate(BaseTemplate):
             print(f"Verifica luogo di partenza: {data['luogo_partenza']}")
             
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
@@ -145,13 +139,7 @@ class TrasportoTemplate(BaseTemplate):
             print(f"Verifica tipo di veicolo: {data['tipo_veicolo']}")
             
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 

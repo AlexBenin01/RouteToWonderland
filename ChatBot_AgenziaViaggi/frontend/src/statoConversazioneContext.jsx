@@ -12,11 +12,11 @@ export const StatoConversazioneProvider = ({ children }) => {
     return {};
   });
 
-  // Resetta lo stato quando il localStorage viene pulito
+  // Resetta lo stato quando il sessionStorage viene pulito
   useEffect(() => {
     const handleStorageChange = () => {
-      if (!localStorage.getItem('chatHistory')) {
-        console.log('StatoConversazioneProvider - Reset stato per pulizia localStorage');
+      if (!sessionStorage.getItem('chatHistory')) {
+        console.log('StatoConversazioneProvider - Reset stato per pulizia sessionStorage');
         setStatoConversazione_context({});
       }
     };

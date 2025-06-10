@@ -6,13 +6,13 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection
 
 class NoleggiTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
@@ -46,13 +46,7 @@ class NoleggiTemplate(BaseTemplate):
             print(f"Verifica tipo di cambio per: {data['tipo_cambio']}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
@@ -83,9 +77,13 @@ class NoleggiTemplate(BaseTemplate):
                         return True, "Tipo di cambio verificato", corrected_data
                     else:
                         print(f"Tipo di cambio '{data['tipo_cambio']}' non ha corrispondenze sufficientemente simili")
+                        corrected_data['tipo_cambio'] = None
+                        data['tipo_cambio'] = None
                         return False, "Tipo di cambio non valido", corrected_data
                 else:
                     print(f"Nessun risultato trovato per il tipo di cambio '{data['tipo_cambio']}'")
+                    corrected_data['tipo_cambio'] = None
+                    data['tipo_cambio'] = None
                     return False, "Tipo di cambio non valido", corrected_data
 
             except Exception as e:
@@ -119,24 +117,22 @@ class NoleggiTemplate(BaseTemplate):
         print(f"[DEBUG] Dati ricevuti: {data}")
         corrected_data = data.copy()
         template_data = self.get_template_data()
+        errors = []
         
         try:
-
-            
             # Validazione posti_auto
             if 'posti_auto' in data:
                 print(f"[DEBUG] Validazione posti_auto: {data['posti_auto']}")
                 if not isinstance(data['posti_auto'], int):
                     print("[ERROR] posti_auto non è un intero")
                     corrected_data['posti_auto'] = None
-                    return False, "Il numero di posti auto deve essere un numero intero", corrected_data
-                if data['posti_auto'] < 2:
+                    errors.append("Il numero di posti auto deve essere un numero intero")
+                elif data['posti_auto'] < 2:
                     print("[ERROR] posti_auto fuori range (2- XX)")
                     corrected_data['posti_auto'] = None
-                    return False, "Il numero di posti auto deve essere compreso tra 2 e XX", corrected_data
-                print(f"[DEBUG] posti_auto valido: {data['posti_auto']}")
-
-            
+                    errors.append("Il numero di posti auto deve essere compreso tra 2 e XX")
+                else:
+                    print(f"[DEBUG] posti_auto valido: {data['posti_auto']}")
 
             # Validazione cambio_automatico
             if 'tipo_cambio' in data:
@@ -144,17 +140,25 @@ class NoleggiTemplate(BaseTemplate):
                 is_valid, error_msg, updated_data = self.validate_tipo_cambio(corrected_data)
                 if not is_valid:
                     print(f"[ERROR] Validazione tipo_cambio fallita: {error_msg}")
-                    return False, error_msg, corrected_data
-                corrected_data.update(updated_data)
-                print(f"[DEBUG] tipo_cambio validato con successo: {corrected_data['tipo_cambio']}")
+                    errors.append(error_msg)
+                else:
+                    corrected_data.update(updated_data)
+                    print(f"[DEBUG] tipo_cambio validato con successo: {corrected_data['tipo_cambio']}")
             
-            print("[DEBUG] Validazione completata con successo")
+            print("[DEBUG] Validazione completata")
             print(f"[DEBUG] Dati corretti: {corrected_data}")
+            
+            # Se ci sono errori, restituisci False con tutti gli errori
+            if errors:
+                error_message = "Errori di validazione:\n" + "\n".join(f"- {error}" for error in errors)
+                return False, error_message, corrected_data
+            
             return True, "Dati validi", corrected_data
             
         except Exception as e:
             print(f"[ERROR] Errore durante la validazione: {str(e)}")
-            return False, f"Errore durante la validazione: {str(e)}", corrected_data
+            errors.append(f"Errore durante la validazione: {str(e)}")
+            return False, "\n".join(errors), corrected_data
     
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """

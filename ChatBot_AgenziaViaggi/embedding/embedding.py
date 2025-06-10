@@ -256,12 +256,12 @@ try:
             SET embedding_veicolo = %s
             WHERE veicolo = %s
         """, (emb, veicolo)),
-    for veicolo, emb in zip(alloggi, emb_tipo_trasporto):
+    for alloggio, emb in zip(alloggi, emb_tipo_alloggi):
         cursor.execute("""
             UPDATE tipo_alloggi
             SET embedding_tipo_alloggi = %s
             WHERE alloggi = %s
-        """, (emb, veicolo))
+        """, (emb, alloggio))
     
     for cambio, emb in zip(cambio, emb_tipo_cambio):
         cursor.execute("""

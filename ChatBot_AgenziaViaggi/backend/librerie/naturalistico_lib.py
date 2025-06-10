@@ -7,13 +7,13 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection, release_connection
 
 class NaturalisticoTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
@@ -58,13 +58,7 @@ class NaturalisticoTemplate(BaseTemplate):
             print(f"Verifica attività per: {attivita_list}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
@@ -97,10 +91,10 @@ class NaturalisticoTemplate(BaseTemplate):
                             attivita_corrette.append(attivita_corretta)
                         else:
                             print(f"Attività '{attivita}' non ha corrispondenze sufficientemente simili")
-                            attivita_corrette.append(attivita)
+                            attivita_corrette.append(None)
                     else:
                         print(f"Nessun risultato trovato per l'attività '{attivita}'")
-                        attivita_corrette.append(attivita)
+                        attivita_corrette.append(None)
 
                 except Exception as e:
                     print(f"Errore durante la generazione dell'embedding per '{attivita}': {str(e)}")
@@ -108,9 +102,11 @@ class NaturalisticoTemplate(BaseTemplate):
                     import traceback
                     print("Stack trace:")
                     print(traceback.format_exc())
-                    attivita_corrette.append(attivita)
+                    attivita_corrette.append(None)
 
-            corrected_data['attivita'] = attivita_corrette
+            # Rimuovi i None dalla lista
+            attivita_corrette = [a for a in attivita_corrette if a is not None]
+            corrected_data['attivita'] = attivita_corrette if attivita_corrette else None
             print(f"Attività finali: {attivita_corrette}")
             return True, "Attività verificate", corrected_data
 
@@ -143,13 +139,7 @@ class NaturalisticoTemplate(BaseTemplate):
             print(f"Verifica lingua guida per: {data['lingua_guida']}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
@@ -177,6 +167,8 @@ class NaturalisticoTemplate(BaseTemplate):
                     if distanza < 0.4:
                         print(f"Aggiornamento lingua guida da '{data['lingua_guida']}' a '{lingua_corretta}'")
                         corrected_data['lingua_guida'] = lingua_corretta
+                        corrected_data['guida_esperta'] = True
+                        corrected_data['guida_menzionata'] = True
                         return True, "Lingua guida verificata", corrected_data
                     else:
                         print(f"Lingua guida '{data['lingua_guida']}' non ha corrispondenze sufficientemente simili")
@@ -224,8 +216,7 @@ class NaturalisticoTemplate(BaseTemplate):
         
         # Inizializza corrected_data con tutti i campi del template
         corrected_data = data.copy()
-        
-
+        errors = []
         
         try:
             # Validazione attivita usando validate_attivita
@@ -234,55 +225,69 @@ class NaturalisticoTemplate(BaseTemplate):
                 is_valid, error_msg, updated_data = self.validate_attivita(corrected_data)
                 if not is_valid:
                     print(f"[ERROR] Validazione attivita fallita: {error_msg}")
-                    return False, error_msg, corrected_data
+                    errors.append(error_msg)
                 corrected_data.update(updated_data)
                 print(f"[DEBUG] attivita validata con successo: {corrected_data['attivita']}")
 
             #se guida_menzionata è null, allora non è presente guida_esperta
-            if data['guida_menzionata'] is None:
+            print("[DEBUG]: guida_menzionata",data['guida_menzionata'])
+            if data['guida_menzionata'] == None:
                 print("[DEBUG] guida_menzionata è null, allora non è presente guida_esperta")
                 corrected_data['guida_esperta'] = None
-            if data.get('guida_menzionata') is True:
+                corrected_data['lingua_guida'] = None
+                data['guida_esperta']=None
+            if data['guida_menzionata'] == True:
                 print("[DEBUG] guida_menzionata è true, allora è presente guida_esperta")
                 corrected_data['guida_esperta'] = True
-            if data.get('guida_menzionata') is False:
+                data['guida_esperta']=True
+            if data['guida_menzionata'] == False:
                 print("[DEBUG] guida_menzionata è false, allora non è presente guida_esperta")
                 corrected_data['guida_esperta'] = False
+                data['guida_esperta'] = False
 
-            # Validazione guida_esperta e gestione lingua_guida
-            if 'guida_esperta' in data:
-                print(f"[DEBUG] Validazione guida_esperta: {data['guida_esperta']}")
-                if not isinstance(data['guida_esperta'], bool):
-                    print(f"[ERROR] guida_esperta non è un booleano: {data['guida_esperta']}")
-                    corrected_data['guida_esperta'] = None
-                
-                # Se guida_esperta è false, imposta lingua_guida a "no guida"
-                if corrected_data.get('guida_esperta') is False:
-                    print("[DEBUG] guida_esperta è false, imposto lingua_guida a 'no guida'")
+            # Gestione guida esperta e lingua
+            print("[DEBUG]: guida_esperta",data['guida_esperta'])
+            if data['guida_esperta'] is not None:
+                print(f"[DEBUG] Verifica guida_esperta: {data['guida_esperta']}")
+                if data['guida_esperta'] is False:  # Verifica esplicita per False
+                    print("[DEBUG] Richiesta guida esperta impostata a False")
                     corrected_data['lingua_guida'] = "no guida"
-                print(f"[DEBUG] guida_esperta validato: {corrected_data.get('guida_esperta')}")
-                
-                # Verifica lingua_guida
-            if 'lingua_guida' in data:
-                print(f"[DEBUG] Verifica lingua_guida: {data['lingua_guida']}")
-                if not data['lingua_guida'] or data['lingua_guida'].strip() == "":
-                    print(f"[ERROR] lingua_guida è vuoto")
-                    if corrected_data.get('guida_esperta', False):
-                        corrected_data['lingua_guida'] = None
+                    print(f"[DEBUG] Lingua guida impostata a: {corrected_data['lingua_guida']}")
+                elif data['guida_esperta'] is True:  # Verifica esplicita per True
+                    if 'lingua_guida' not in data or not data['lingua_guida']:
+                        print("[ERROR] Lingua guida mancante o non specificata")
+                        errors.append("La lingua della guida è obbligatoria quando è richiesta una guida esperta")
                     else:
-                        corrected_data['lingua_guida'] = "no guida"
+                        print("[DEBUG] Validazione lingua guida")
+                        is_valid, error_msg, updated_data = self.validate_lingua(corrected_data)
+                        if not is_valid:
+                            errors.append(error_msg)
+                        corrected_data.update(updated_data)
+                        if corrected_data.get('lingua_guida'):
+                            corrected_data['guida_esperta'] = True
+                            corrected_data['guida_menzionata'] = True
+                            print("[DEBUG] Lingua guida validata con successo, impostato guida_esperta e guida_menzionata a True")
+                        print(f"[DEBUG] Lingua guida validata: {corrected_data.get('lingua_guida')}")
+                        
                 else:
-                    is_valid, error_msg, updated_data = self.validate_lingua(corrected_data)
-                    corrected_data.update(updated_data)
-                print(f"[DEBUG] lingua_guida validato: {corrected_data.get('lingua_guida')}")
+                    print("[ERROR] Campo guida_esperta mancante")
+                    errors.append("Il campo guida_esperta è obbligatorio")
+                    corrected_data['lingua_guida'] = None
             
-            print("[DEBUG] Validazione completata con successo")
+            print("[DEBUG] Validazione completata")
             print(f"[DEBUG] Dati corretti: {corrected_data}")
+            
+            # Se ci sono errori, restituisci False con tutti gli errori
+            if errors:
+                error_message = "Errori di validazione:\n" + "\n".join(f"- {error}" for error in errors)
+                return False, error_message, corrected_data
+            
             return True, "Dati validi", corrected_data
             
         except Exception as e:
             print(f"[ERROR] Errore durante la validazione: {str(e)}")
-            return False, f"Errore durante la validazione: {str(e)}", corrected_data
+            errors.append(f"Errore durante la validazione: {str(e)}")
+            return False, "\n".join(errors), corrected_data
     
     def verifica_template(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """

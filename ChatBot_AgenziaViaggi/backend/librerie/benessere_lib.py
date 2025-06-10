@@ -7,13 +7,13 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection
 
 class BenessereTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
@@ -54,13 +54,7 @@ class BenessereTemplate(BaseTemplate):
             print(f"Verifica trattamenti per: {trattamenti_list}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
@@ -92,10 +86,10 @@ class BenessereTemplate(BaseTemplate):
                             trattamenti_corretti.append(trattamento_corretto)
                         else:
                             print(f"Trattamento '{trattamento}' non ha corrispondenze sufficientemente simili")
-                            trattamenti_corretti.append(trattamento)
+                            trattamenti_corretti.append(None)
                     else:
                         print(f"Nessun risultato trovato per il trattamento '{trattamento}'")
-                        trattamenti_corretti.append(trattamento)
+                        trattamenti_corretti.append(None)
 
                 except Exception as e:
                     print(f"Errore durante la generazione dell'embedding per '{trattamento}': {str(e)}")
@@ -103,9 +97,11 @@ class BenessereTemplate(BaseTemplate):
                     import traceback
                     print("Stack trace:")
                     print(traceback.format_exc())
-                    trattamenti_corretti.append(trattamento)
-
-            corrected_data['trattamenti'] = trattamenti_corretti
+                    trattamenti_corretti.append(None)
+            
+        # Rimuovi i None dalla lista
+            trattamenti_corretti = [a for a in trattamenti_corretti if a is not None]
+            corrected_data['trattamenti'] = trattamenti_corretti if trattamenti_corretti else None
             print(f"Trattamenti finali: {trattamenti_corretti}")
             return True, "Trattamenti verificati", corrected_data
 

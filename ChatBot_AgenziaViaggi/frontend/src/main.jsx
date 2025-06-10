@@ -1,63 +1,55 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import App from './App'
 import Riepilogo from './pages/riepilogo'
+import Fine from './pages/fine'
 import './index.css'
 import { StatoConversazioneProvider } from './statoConversazioneContext'
 
-// Funzione per forzare la pulizia del sessionStorage
-const forceClearSessionStorage = () => {
-  console.log('=== FORZATURA PULIZIA SESSIONSTORAGE ===');
-  console.log('Stato prima della pulizia:', Object.keys(sessionStorage));
+// Componente ProtectedRoute per proteggere le route
+const ProtectedRoute = ({ children, requireOrderCompletion = false }) => {
+  const location = useLocation();
   
-  // Forza la pulizia
-  sessionStorage.clear();
+  // Verifica se l'utente arriva dalla navigazione corretta
+  if (!location.state?.fromApp) {
+    // Se non arriva dalla navigazione corretta, reindirizza alla home
+    return <Navigate to="/" replace />;
+  }
+
+  // Se la rotta richiede il completamento dell'ordine
+  if (requireOrderCompletion && !location.state?.orderCompleted) {
+    // Se l'ordine non è stato completato, reindirizza alla home
+    return <Navigate to="/" replace />;
+  }
   
-  // Rimuovi specificamente tutte le chiavi che potrebbero essere presenti
-  const keysToRemove = [
-    'chatHistory',
-    'currentTemplate',
-    'riepilogoData',
-    'statoConversazione',
-    'debugData'
-  ];
-  
-  keysToRemove.forEach(key => {
-    sessionStorage.removeItem(key);
-    console.log(`Rimossa chiave: ${key}`);
-  });
-  
-  // Verifica che sia effettivamente vuoto
-  console.log('Stato dopo la pulizia:', Object.keys(sessionStorage));
-  console.log('=== FINE PULIZIA SESSIONSTORAGE ===');
+  return children;
 };
-
-// Esegui la pulizia forzata
-forceClearSessionStorage();
-
-function Main() {
-  // Pulisci il sessionStorage anche al mount del componente
-  React.useEffect(() => {
-    console.log('Pulizia sessionStorage al mount...');
-    forceClearSessionStorage();
-  }, []);
-
-  return (
-    <StatoConversazioneProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<App />} />
-          <Route path="/riepilogo" element={<Riepilogo />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </StatoConversazioneProvider>
-  );
-}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Main />
+    <BrowserRouter>
+      <StatoConversazioneProvider>
+        <Routes>
+          <Route path="/" element={<App />} />
+          <Route 
+            path="/riepilogo" 
+            element={
+              <ProtectedRoute>
+                <Riepilogo />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/fine" 
+            element={
+              <ProtectedRoute requireOrderCompletion={true}>
+                <Fine />
+              </ProtectedRoute>
+            } 
+          />
+        </Routes>
+      </StatoConversazioneProvider>
+    </BrowserRouter>
   </React.StrictMode>
 )

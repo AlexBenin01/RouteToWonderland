@@ -460,6 +460,7 @@ def process_trasporto(template_data: Dict[str, Any], luogo: str, persone: int, b
     in base al tipo di veicolo, luogo di partenza, luogo di arrivo e budget disponibile.
     Se il veicolo scelto costa più del budget o non viene trovato, restituisce l'opzione meno costosa.
     Decrementa il budget_viaggio del costo del trasporto scelto.
+    Il costo viene calcolato per persona e include andata e ritorno.
     
     Args:
         template_data: Dizionario contenente i dati del template trasporto
@@ -484,6 +485,9 @@ def process_trasporto(template_data: Dict[str, Any], luogo: str, persone: int, b
         
         try:
             # Prima prova a trovare il veicolo specificato che rientra nel budget
+            # Dividiamo il budget per il numero di persone e per 2 (andata e ritorno)
+            budget_per_persona = budget_viaggio[0] / (persone * 2) if budget_viaggio[0] else 0
+            
             if budget_viaggio[0]:
                 cursor.execute("""
                     SELECT veicolo, luogo_partenza, luogo_arrivo, costo 
@@ -494,7 +498,7 @@ def process_trasporto(template_data: Dict[str, Any], luogo: str, persone: int, b
                     AND costo <= %s
                     ORDER BY costo ASC
                     LIMIT 1
-                """, (tipo_veicolo, luogo_partenza, luogo_arrivo, budget_viaggio[0]))
+                """, (tipo_veicolo, luogo_partenza, luogo_arrivo, budget_per_persona))
             else:
                 cursor.execute("""
                     SELECT veicolo, luogo_partenza, luogo_arrivo, costo 
@@ -520,7 +524,7 @@ def process_trasporto(template_data: Dict[str, Any], luogo: str, persone: int, b
                         AND costo <= %s
                         ORDER BY costo ASC
                         LIMIT 1
-                    """, (luogo_partenza, luogo_arrivo, budget_viaggio[0]))
+                    """, (luogo_partenza, luogo_arrivo, budget_per_persona))
                 else:
                     cursor.execute("""
                         SELECT veicolo, luogo_partenza, luogo_arrivo, costo 
@@ -533,16 +537,25 @@ def process_trasporto(template_data: Dict[str, Any], luogo: str, persone: int, b
                 risultato = cursor.fetchone()
             
             if risultato:
-                veicolo, partenza, arrivo, costo = risultato
+                veicolo, partenza, arrivo, costo_base = risultato
+                # Calcola il costo totale (costo base * persone * 2 per andata e ritorno)
+                costo_totale = costo_base * persone * 2
+                
                 # Decrementa il budget
                 if budget_viaggio[0]:
-                    budget_viaggio[0] -= costo
-                logger.info(f"Trovato trasporto: {veicolo} da {partenza} a {arrivo} al costo di {costo}")
+                    budget_viaggio[0] -= costo_totale
+                
+                logger.info(f"Trovato trasporto: {veicolo} da {partenza} a {arrivo}")
+                logger.info(f"Costo base per persona: {costo_base}, Numero persone: {persone}")
+                logger.info(f"Costo totale (andata e ritorno): {costo_totale}")
+                
                 return {
                     "veicolo": veicolo,
                     "luogo_partenza": partenza,
                     "luogo_arrivo": arrivo,
-                    "costo": costo
+                    "costo_base": costo_base,
+                    "costo_totale": costo_totale,
+                    "include_ritorno": True
                 }
             else:
                 logger.warning(f"Nessun trasporto trovato da {luogo_partenza} a {luogo_arrivo} nel budget disponibile")
@@ -1405,6 +1418,8 @@ def process_gastronomia(template_data: Dict[str, Any], luogo: str, persone: int,
     Processa il template gastronomia cercando nel database le attività disponibili
     in base al tipo di degustazione, luogo e budget disponibile.
     Se sono richiesti corsi di cucina, aggiunge il costo fisso di 20€ per persona.
+    Il costo totale viene calcolato moltiplicando il prezzo per persona per il numero di persone.
+    I corsi di cucina vengono aggiunti come attività separata alla fine dell'array.
     
     Args:
         template_data: Dizionario contenente i dati del template gastronomia
@@ -1439,7 +1454,7 @@ def process_gastronomia(template_data: Dict[str, Any], luogo: str, persone: int,
             elif isinstance(degustazioni, list) and degustazioni and isinstance(degustazioni[0], list):
                 degustazioni = degustazioni[0]
             
-            for tipo in degustazioni:  # degustazioni è una lista di liste
+            for tipo in degustazioni:
                 # Inizializza le variabili per il ciclo
                 tentativi = 0
                 max_tentativi = 10
@@ -1461,11 +1476,8 @@ def process_gastronomia(template_data: Dict[str, Any], luogo: str, persone: int,
                     
                     if risultato:
                         nome, degustazioni, prezzo_persona, luogo = risultato
-                        costo_attivita = prezzo_persona * persone
-                        
-                        # Aggiungi il costo dei corsi di cucina se richiesti
-                        if corsi_richiesti:
-                            costo_attivita += 20 * persone
+                        costo_base = prezzo_persona * persone
+                        costo_attivita = costo_base
                         
                         if costo_attivita <= budget_viaggio[0]:
                             attivita_trovata = {
@@ -1473,11 +1485,7 @@ def process_gastronomia(template_data: Dict[str, Any], luogo: str, persone: int,
                                 "tipo": degustazioni,
                                 "prezzo_persona": prezzo_persona,
                                 "luogo": luogo,
-                                "costo_totale": costo_attivita,
-                                "corsi_cucina": {
-                                    "richiesti": corsi_richiesti,
-                                    "costo": 20 * persone if corsi_richiesti else 0
-                                } if corsi_richiesti else None
+                                "costo_totale": costo_base
                             }
                             break
                     
@@ -1492,11 +1500,8 @@ def process_gastronomia(template_data: Dict[str, Any], luogo: str, persone: int,
                     
                     if risultato:
                         nome, degustazioni, prezzo_persona, luogo = risultato
-                        costo_attivita = prezzo_persona * persone
-                        
-                        # Aggiungi il costo dei corsi di cucina se richiesti
-                        if corsi_richiesti:
-                            costo_attivita += 20 * persone
+                        costo_base = prezzo_persona * persone
+                        costo_attivita = costo_base
                         
                         if costo_attivita <= budget_viaggio[0]:
                             attivita_trovata = {
@@ -1504,11 +1509,7 @@ def process_gastronomia(template_data: Dict[str, Any], luogo: str, persone: int,
                                 "tipo": degustazioni,
                                 "prezzo_persona": prezzo_persona,
                                 "luogo": luogo,
-                                "costo_totale": costo_attivita,
-                                "corsi_cucina": {
-                                    "richiesti": corsi_richiesti,
-                                    "costo": 20 * persone if corsi_richiesti else 0
-                                } if corsi_richiesti else None
+                                "costo_totale": costo_base
                             }
                 
                 if attivita_trovata:
@@ -1517,10 +1518,23 @@ def process_gastronomia(template_data: Dict[str, Any], luogo: str, persone: int,
                     
                     logger.info(f"Trovata degustazione: {degustazioni} con {attivita_trovata['nome']} a {luogo}")
                     logger.info(f"Prezzo per persona: {attivita_trovata['prezzo_persona']}, Costo totale: {attivita_trovata['costo_totale']}")
-                    if corsi_richiesti:
-                        logger.info(f"Costo corsi di cucina: {20 * persone}")
                 else:
                     logger.warning(f"Nessuna degustazione di tipo {tipo} trovata per {luogo} nel budget disponibile")
+            
+            # Aggiungi i corsi di cucina come attività separata se richiesti
+            if corsi_richiesti:
+                costo_corsi = 20 * persone
+                if costo_corsi <= budget_viaggio[0]:
+                    attivita_corsi = {
+                        "nome": "Corsi di Cucina",
+                        "tipo": "corsi_cucina",
+                        "prezzo_persona": 20,
+                        "luogo": luogo,
+                        "costo_totale": costo_corsi
+                    }
+                    attivita_trovate.append(attivita_corsi)
+                    costo_totale += costo_corsi
+                    logger.info(f"Aggiunto corso di cucina con costo totale: {costo_corsi}")
             
             if attivita_trovate:
                 risultato = {

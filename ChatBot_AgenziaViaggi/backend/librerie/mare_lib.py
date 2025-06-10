@@ -7,20 +7,17 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection, release_connection
 
 class MareTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
         super().__init__(template_manager)
-        self.template_name = "mare"
-        self.template_path = f"template/{self.template_name}.json"
-        self.template_data = self._load_template()
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
     
@@ -61,13 +58,7 @@ class MareTemplate(BaseTemplate):
             print(f"Verifica attività marine per: {attivita_list}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
@@ -100,10 +91,10 @@ class MareTemplate(BaseTemplate):
                             attivita_corrette.append(attivita_corretta)
                         else:
                             print(f"Attività marina '{attivita}' non ha corrispondenze sufficientemente simili")
-                            attivita_corrette.append(attivita)
+                            attivita_corrette.append(None)
                     else:
                         print(f"Nessun risultato trovato per l'attività marina '{attivita}'")
-                        attivita_corrette.append(attivita)
+                        attivita_corrette.append(None)
 
                 except Exception as e:
                     print(f"Errore durante la generazione dell'embedding per '{attivita}': {str(e)}")
@@ -111,11 +102,13 @@ class MareTemplate(BaseTemplate):
                     import traceback
                     print("Stack trace:")
                     print(traceback.format_exc())
-                    attivita_corrette.append(attivita)
+                    attivita_corrette.append(None)
 
-            corrected_data['attivita'] = attivita_corrette
-            print(f"Attività marine finali: {attivita_corrette}")
-            return True, "Attività marine verificate", corrected_data
+            # Rimuovi i None dalla lista
+            attivita_corrette = [a for a in attivita_corrette if a is not None]
+            corrected_data['attivita'] = attivita_corrette if attivita_corrette else None
+            print(f"Attività finali: {attivita_corrette}")
+            return True, "Attività verificate", corrected_data
 
         except Exception as e:
             print(f"Errore durante la verifica delle attività marine: {str(e)}")
@@ -155,7 +148,14 @@ class MareTemplate(BaseTemplate):
             if 'attrezzatura' in data:
                 corrected_data['attrezzatura'] = data['attrezzatura']
                 # Se attrezzatura è valorizzata, copia lo stesso valore in attrezzatura_menzionata
-                corrected_data['attrezzatura_menzionata'] = data['attrezzatura']
+                if data['attrezzatura'] is not None:
+                    corrected_data['attrezzatura_menzionata'] = corrected_data['attrezzatura']
+            
+            if 'attrezzatura_menzionata' in data:
+                corrected_data['attrezzatura_menzionata'] = data['attrezzatura_menzionata']
+
+                if data['attrezzatura_menzionata'] is not None:
+                    corrected_data['attrezzatura'] = corrected_data['attrezzatura_menzionata']
             
                 
 

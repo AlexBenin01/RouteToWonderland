@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 class MasterTemplateManager:
     def __init__(self):
         try:
-            
+            # Inizializza template_master come dizionario vuoto
+            self.template_master = {}
             
             # Percorso del file template master
             template_path = os.path.join(os.path.dirname(__file__), '..', 'template', 'master_template.json')
@@ -157,7 +158,7 @@ class MasterTemplateManager:
         logger.info("Processo template intro")
         
         # Se ci sono bambini, imposta tipo_partecipanti a "famiglia"
-        if 'bambini' in self.template_master and int(self.template_master['bambini']) > 0:
+        if 'bambini' in self.template_master and self.template_master['bambini'] is not None and int(self.template_master['bambini']) > 0:
             template_aggiornato['tipo_partecipanti'] = "famiglia"
             logger.info("Impostato tipo_partecipanti a 'famiglia' per presenza di bambini")
             

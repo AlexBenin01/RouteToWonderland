@@ -26,6 +26,7 @@ from services.drools_service import DroolsService
 from librerie.master_template_lib import MasterTemplateManager
 from librerie.template_manager import TemplateManager
 from librerie.riepilogo import process_riepilogo
+from librerie.database import get_db_connection, release_connection
 import logging
 import sys
 
@@ -111,6 +112,12 @@ class TravelPreferenceRequest(BaseModel):
     trip_duration: int
     mood_vacanza: List[str]
     budget_viaggio: int
+
+class OrdineRequest(BaseModel):
+    budget_usato: float
+    documento: str
+
+
 
 def create_empty_template(empty: Dict[str, Any]) -> Dict[str, Any]:
     template_vuoto = {key: None for key in empty.keys()}
@@ -301,7 +308,8 @@ async def extract_simple(request: SimpleRequest):
                         "guide_phrase": risposta,
                         "template_usato": template_manager.active_template,
                         "stato_conversazione": stato_attuale,
-                        "exit": False
+                        "exit": False,
+                        "riepilogo": False
                     }
                     logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (risposta personalizzata) ===")
                     return response
@@ -314,7 +322,8 @@ async def extract_simple(request: SimpleRequest):
                         "guide_phrase": risposta,
                         "template_usato": template_manager.active_template,
                         "stato_conversazione": stato_attuale,
-                        "exit": True
+                        "exit": True,
+                        "riepilogo": False
                     }
                     logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
                     return response
@@ -329,7 +338,8 @@ async def extract_simple(request: SimpleRequest):
                             "guide_phrase": risposta,
                             "template_usato": template_manager.active_template,
                             "stato_conversazione": stato_attuale,
-                            "exit": False
+                            "exit": False,
+                            "riepilogo": False
                         }
                         logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (risposta personalizzata) ===")
                         return response
@@ -341,7 +351,8 @@ async def extract_simple(request: SimpleRequest):
                             "guide_phrase": risposta,
                             "template_usato": template_manager.active_template,
                             "stato_conversazione": stato_attuale,
-                            "exit": True
+                            "exit": True,
+                            "riepilogo": False
                         }
                         logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
                         return response
@@ -355,7 +366,8 @@ async def extract_simple(request: SimpleRequest):
                         "guide_phrase": risposta,
                         "template_usato": template_manager.active_template,
                         "stato_conversazione": stato_attuale,
-                        "exit": False
+                        "exit": False,
+                        "riepilogo": False
                     }
                     logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
                     return response
@@ -496,7 +508,8 @@ async def extract_simple(request: SimpleRequest):
                         "stato_conversazione": stato_attuale,
                         "nuovo_template": True,
                         "next_template": next_template,
-                        "exit": False
+                        "exit": False,
+                        "riepilogo": False
                     }
                     logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE (cambio template) ===")
                     return response
@@ -509,7 +522,7 @@ async def extract_simple(request: SimpleRequest):
                     "stato_conversazione": stato_attuale,
                     "nuovo_template": False,
                     "exit": False,
-                    "riepilogo": riepilogo
+                    "riepilogo": True
                 }
         
         # Ottieni la risposta da Ollama
@@ -534,7 +547,8 @@ async def extract_simple(request: SimpleRequest):
             "guide_phrase": risposta,
             "template_usato": template_manager.active_template,
             "stato_conversazione": stato_attuale,
-            "exit": False
+            "exit": False,
+            "riepilogo": False
         }
         
         logger.info("=== FINE RICHIESTA EXTRACT_SIMPLE ===")
@@ -835,6 +849,58 @@ async def get_summary():
         logger.error(f"Errore in get_summary: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/completa_ordine")
+async def completa_ordine(ordine: OrdineRequest):
+    global STATO_CONVERSAZIONE_JSON, CONTESTO_CONVERSAZIONE, EXIT_COUNTER
+    conn = None
+    try:
+        # Ottieni una connessione dal pool usando la funzione get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Aggiorna il budget speso nella tabella clienti
+        cur.execute("""
+            UPDATE clienti 
+            SET budget_tot_speso = COALESCE(budget_tot_speso, 0) + %s
+            WHERE identificativo = %s
+            RETURNING identificativo, budget_tot_speso
+        """, (
+            ordine.budget_usato,
+            ordine.documento,
+        ))
+        
+        # Verifica se l'aggiornamento è avvenuto
+        result = cur.fetchone()
+        if not result:
+            raise HTTPException(status_code=404, detail="Cliente non trovato")
+        
+        # Commit della transazione
+        conn.commit()
+
+        # Reset di tutte le variabili globali
+        STATO_CONVERSAZIONE_JSON = "{}"
+        CONTESTO_CONVERSAZIONE = {}
+        EXIT_COUNTER = 0
+        
+        # Reset del template manager
+        template_manager.set_active_template("intro")
+        template_manager.update_template_sequence(["intro", "contatti", "trasporto"])
+        
+        return {
+            "message": "Budget aggiornato con successo", 
+            "identificativo": result[0],
+            "budget_totale": result[1]
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore durante l'aggiornamento del budget: {str(e)}")
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Rilascia la connessione nel pool usando la funzione release_connection
+        if conn:
+            release_connection(conn)
 
 
 

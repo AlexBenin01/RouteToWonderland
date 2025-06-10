@@ -7,7 +7,6 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
@@ -15,6 +14,7 @@ from pathlib import Path
 import logging
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection, release_connection
 
 # Configurazione del logging
 logging.basicConfig(
@@ -54,13 +54,7 @@ class CittaArteTemplate(BaseTemplate):
             print(f"Verifica attività per: {attivita_list}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
@@ -93,10 +87,10 @@ class CittaArteTemplate(BaseTemplate):
                             attivita_corrette.append(attivita_corretta)
                         else:
                             print(f"Attività '{attivita}' non ha corrispondenze sufficientemente simili")
-                            attivita_corrette.append(attivita)
+                            attivita_corrette.append(None)
                     else:
                         print(f"Nessun risultato trovato per l'attività '{attivita}'")
-                        attivita_corrette.append(attivita)
+                        attivita_corrette.append(None)
 
                 except Exception as e:
                     print(f"Errore durante la generazione dell'embedding per '{attivita}': {str(e)}")
@@ -104,9 +98,12 @@ class CittaArteTemplate(BaseTemplate):
                     import traceback
                     print("Stack trace:")
                     print(traceback.format_exc())
-                    attivita_corrette.append(attivita)
+                    attivita_corrette.append(None)
 
-            corrected_data['attivita'] = attivita_corrette
+
+        # Rimuovi i None dalla lista
+            attivita_corrette = [a for a in attivita_corrette if a is not None]
+            corrected_data['attivita'] = attivita_corrette if attivita_corrette else None
             print(f"Attività finali: {attivita_corrette}")
             return True, "Attività verificate", corrected_data
 
@@ -139,13 +136,7 @@ class CittaArteTemplate(BaseTemplate):
             print(f"Verifica lingua guida per: {data['lingua_guida']}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
@@ -173,6 +164,8 @@ class CittaArteTemplate(BaseTemplate):
                     if distanza < 0.4:
                         print(f"Aggiornamento lingua guida da '{data['lingua_guida']}' a '{lingua_corretta}'")
                         corrected_data['lingua_guida'] = lingua_corretta
+                        corrected_data['guida_turistica'] = True
+                        corrected_data['guida_menzionata'] = True
                         return True, "Lingua guida verificata", corrected_data
                     else:
                         print(f"Lingua guida '{data['lingua_guida']}' non ha corrispondenze sufficientemente simili")
@@ -231,19 +224,24 @@ class CittaArteTemplate(BaseTemplate):
 
 
             #se guida_menzionata è null, allora non è presente guida_turistica
-            if data['guida_menzionata'] is None:
+            print("[DEBUG]: guida_menzionata",data['guida_menzionata'])
+            if data['guida_menzionata'] == None:
                 print("[DEBUG] guida_menzionata è null, allora non è presente guida_turistica")
                 corrected_data['guida_turistica'] = None
-            if data.get('guida_menzionata') is True:
+                corrected_data['lingua_guida'] = None
+                data['guida_turistica']=None
+            if data['guida_menzionata'] == True:
                 print("[DEBUG] guida_menzionata è true, allora è presente guida_turistica")
                 corrected_data['guida_turistica'] = True
-            if data.get('guida_menzionata') is False:
+                data['guida_turistica']=True
+            if data['guida_menzionata'] == False:
                 print("[DEBUG] guida_menzionata è false, allora non è presente guida_turistica")
                 corrected_data['guida_turistica'] = False
-
+                data['guida_turistica']=False
 
             # Gestione guida turistica e lingua
-            if 'guida_turistica' in data:
+            print("[DEBUG]: guida_turistica",data['guida_turistica'])
+            if data['guida_turistica'] is not None:
                 print(f"[DEBUG] Verifica guida_turistica: {data['guida_turistica']}")
                 if data['guida_turistica'] is False:  # Verifica esplicita per False
                     print("[DEBUG] Richiesta guida turistica impostata a False")
@@ -257,10 +255,16 @@ class CittaArteTemplate(BaseTemplate):
                         print("[DEBUG] Validazione lingua guida")
                         is_valid, error_msg, updated_data = self.validate_lingua(corrected_data)
                         corrected_data.update(updated_data)
+                        if corrected_data.get('lingua_guida'):
+                            corrected_data['guida_turistica'] = True
+                            corrected_data['guida_menzionata'] = True
+                            print("[DEBUG] Lingua guida validata con successo, impostato guida_turistica e guida_menzionata a True")
                         print(f"[DEBUG] Lingua guida validata: {corrected_data.get('lingua_guida')}")
-            else:
-                print("[ERROR] Campo guida_turistica mancante")
-                return False, "Il campo guida_turistica è obbligatorio", corrected_data
+                
+                else:
+                    print("[ERROR] Campo guida_turistica mancante")
+                    corrected_data['lingua_guida'] = None
+                    return False, "Il campo guida_turistica è obbligatorio", corrected_data
 
             
             print("[DEBUG] Validazione completata con successo")

@@ -7,20 +7,18 @@ import json
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
 import re
-import psycopg2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 from pathlib import Path
 from .template_manager import TemplateManager
 from .base_template import BaseTemplate
+from .database import get_db_connection, release_connection
+
 
 class MontagnaTemplate(BaseTemplate):
     def __init__(self, template_manager: TemplateManager):
         super().__init__(template_manager)
-        self.template_name = "montagna"
-        self.template_path = f"template/{self.template_name}.json"
-        self.template_data = self._load_template()
         self.model_path = str(Path(__file__).resolve().parent.parent.parent / 'nomic-embed-text-v1.5')
         self.model = SentenceTransformer(self.model_path, trust_remote_code=True)
     
@@ -55,32 +53,27 @@ class MontagnaTemplate(BaseTemplate):
         
         try:
             if 'attivita' not in data or not data['attivita']:
-                return True, "Le attività montane sono opzionali", corrected_data
+                return True, "Le attività sono opzionali", corrected_data
 
             # Converti in lista se è una stringa singola
             attivita_list = data['attivita'] if isinstance(data['attivita'], list) else [data['attivita']]
-            print(f"Verifica attività montane per: {attivita_list}")
+            print(f"Verifica attività per: {attivita_list}")
 
             print("Tentativo di connessione al database...")
-            conn = psycopg2.connect(
-                dbname="routeToWonderland",
-                user="postgres",
-                password="admin",
-                host="localhost",
-                port=5432
-            )
+            conn = get_db_connection()
             print("Connessione al database stabilita con successo")
             cursor = conn.cursor()
 
             attivita_corrette = []
             for attivita in attivita_list:
                 try:
-                    print(f"Generazione embedding per attività montana: '{attivita}'")
+                    print(f"Generazione embedding per attività: '{attivita}'")
                     attivita_embedding = self.model.encode(attivita)
                     print(f"Embedding generato con successo, dimensione: {len(attivita_embedding)}")
+                    # Converti l'array NumPy in lista
                     attivita_embedding = attivita_embedding.tolist()
 
-                    print("Esecuzione query per trovare l'attività montana più simile...")
+                    print("Esecuzione query per trovare l'attività più simile...")
                     cursor.execute("""
                         SELECT attivita, embedding_attivita <=> %s::vector as distanza
                         FROM attivita_montagna
@@ -88,7 +81,8 @@ class MontagnaTemplate(BaseTemplate):
                         ORDER BY distanza ASC
                         LIMIT 1
                     """, (attivita_embedding,))
-                    
+
+                    print("Query eseguita con successo, attendo i risultati...")
                     risultato = cursor.fetchall()
                     print(f"Risultato query: {risultato}")
 
@@ -99,11 +93,11 @@ class MontagnaTemplate(BaseTemplate):
                             print(f"Aggiornamento attività da '{attivita}' a '{attivita_corretta}'")
                             attivita_corrette.append(attivita_corretta)
                         else:
-                            print(f"Attività montana '{attivita}' non ha corrispondenze sufficientemente simili")
-                            attivita_corrette.append(attivita)
+                            print(f"Attività '{attivita}' non ha corrispondenze sufficientemente simili")
+                            attivita_corrette.append(None)
                     else:
-                        print(f"Nessun risultato trovato per l'attività montana '{attivita}'")
-                        attivita_corrette.append(attivita)
+                        print(f"Nessun risultato trovato per l'attività '{attivita}'")
+                        attivita_corrette.append(None)
 
                 except Exception as e:
                     print(f"Errore durante la generazione dell'embedding per '{attivita}': {str(e)}")
@@ -111,11 +105,13 @@ class MontagnaTemplate(BaseTemplate):
                     import traceback
                     print("Stack trace:")
                     print(traceback.format_exc())
-                    attivita_corrette.append(attivita)
+                    attivita_corrette.append(None)
 
-            corrected_data['attivita'] = attivita_corrette
-            print(f"Attività montane finali: {attivita_corrette}")
-            return True, "Attività montane verificate con successo", corrected_data
+            # Rimuovi i None dalla lista
+            attivita_corrette = [a for a in attivita_corrette if a is not None]
+            corrected_data['attivita'] = attivita_corrette if attivita_corrette else None
+            print(f"Attività finali: {attivita_corrette}")
+            return True, "Attività verificate", corrected_data
 
         except Exception as e:
             print(f"Errore durante la verifica delle attività montane: {str(e)}")
@@ -151,13 +147,18 @@ class MontagnaTemplate(BaseTemplate):
                 print(f"[DEBUG] attivita validata con successo: {corrected_data['attivita']}")
             
 
-             # Mantieni il valore di attrezzatura se presente
+            # Mantieni il valore di attrezzatura se presente
             if 'attrezzatura' in data:
                 corrected_data['attrezzatura'] = data['attrezzatura']
                 # Se attrezzatura è valorizzata, copia lo stesso valore in attrezzatura_menzionata
                 if data['attrezzatura'] is not None:
-                    corrected_data['attrezzatura_menzionata'] = data['attrezzatura']
+                    corrected_data['attrezzatura_menzionata'] = corrected_data['attrezzatura']
             
+            if 'attrezzatura_menzionata' in data:
+                corrected_data['attrezzatura_menzionata'] = data['attrezzatura_menzionata']
+
+                if data['attrezzatura_menzionata'] is not None:
+                    corrected_data['attrezzatura'] = corrected_data['attrezzatura_menzionata']
             
             print("[DEBUG] Validazione completata con successo")
             print(f"[DEBUG] Dati corretti: {corrected_data}")

@@ -15,7 +15,8 @@ const TEMPLATES_LABELS = {
   mare: 'Mare',
   gastronomia: 'Gastronomia',
   citta_arte: 'Città darte',
-  benessere: 'Benessere'
+  benessere: 'Benessere',
+  riepilogo: 'Riepilogo'
 }
 
 // Manteniamo solo la frase di apertura per intro
@@ -33,11 +34,45 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
+// Funzione per verificare se è un ricaricamento manuale
+const isManualReload = () => {
+  const lastReloadTime = sessionStorage.getItem('lastReloadTime');
+  const currentTime = Date.now();
+  
+  if (!lastReloadTime) {
+    return false;
+  }
+
+  const timeDiff = currentTime - parseInt(lastReloadTime);
+  
+  if (timeDiff < 2000) {
+    console.log('Ricarico automatico rilevato (differenza tempo:', timeDiff, 'ms)');
+    return false;
+  }
+
+  console.log('Ricarico manuale rilevato (differenza tempo:', timeDiff, 'ms)');
+  return true;
+};
+
+// Funzione per impostare il timestamp dell'ultimo ricaricamento
+const setLastReloadTime = () => {
+  sessionStorage.setItem('lastReloadTime', Date.now().toString());
+};
+
 // Funzione per pulire tutti i dati
 const clearAllData = () => {
   console.log('=== PULIZIA COMPLETA DEI DATI ===');
   sessionStorage.clear();
-  console.log('Dati puliti:', Object.keys(sessionStorage));
+  setChat([{ sender: 'bot', text: INTRO_PHRASE }]);
+  setCurrentTemplate('intro');
+  setStatoConversazione({});
+  setDebugData({});
+  setStatoConversazione_context({});
+  setChatHistory([]);
+  setExit(false);
+  setLoading(false);
+  setShowGuidaChoice(false);
+  setStepChoicePending(false);
 };
 
 function App() {
@@ -68,6 +103,7 @@ function App() {
   const [showGuidaChoice, setShowGuidaChoice] = useState(false)
   const [stepChoicePending, setStepChoicePending] = useState(false)
   const [chatHistory, setChatHistory] = useState([])
+  const [tempExitMessage, setTempExitMessage] = useState(null)
   const location = useLocation();
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [keepChatActive, setKeepChatActive] = useState(false);
@@ -76,6 +112,7 @@ function App() {
   useEffect(() => {
     if (chat.length > 0) {
       sessionStorage.setItem('chatHistory', JSON.stringify(chat));
+      console.log('Chat salvata in sessionStorage:', chat);
     }
   }, [chat]);
 
@@ -106,10 +143,26 @@ function App() {
     sessionStorage.setItem('debugData', JSON.stringify(newDebug));
   };
 
+  // Salva debugData nel sessionStorage quando cambia
+  useEffect(() => {
+    if (Object.keys(debugData).length > 0) {
+      sessionStorage.setItem('debugData', JSON.stringify(debugData));
+    }
+  }, [debugData]);
+
   // Solo useEffect per l'inizializzazione della chat
   useEffect(() => {
+    console.log('Location state:', location.state);
     if (location.state?.chatHistory) {
-      setChat(location.state.chatHistory);
+      console.log('Ripristino chat da location state:', location.state.chatHistory);
+      // Recupera la chat più recente dal sessionStorage
+      const currentChat = sessionStorage.getItem('chatHistory');
+      const chatToUse = currentChat ? JSON.parse(currentChat) : location.state.chatHistory;
+      
+      console.log('Chat da utilizzare:', chatToUse);
+      setChat(chatToUse);
+      // Salva immediatamente la chat nel sessionStorage
+      sessionStorage.setItem('chatHistory', JSON.stringify(chatToUse));
       setKeepChatActive(location.state.keepChatActive || false);
       setExit(location.state.keepChatActive ? false : true);
       // Mantieni il template corrente quando si torna dalla pagina riepilogo
@@ -117,20 +170,26 @@ function App() {
         console.log('Template ricevuto da location state:', location.state.currentTemplate);
         updateTemplate(location.state.currentTemplate);
       }
-    } else if (!sessionStorage.getItem('chatHistory')) {
-      setChat([
-        { sender: 'bot', text: INTRO_PHRASE }
-      ]);
-      updateTemplate('intro');
+    } else {
+      const savedChat = sessionStorage.getItem('chatHistory');
+      if (savedChat) {
+        console.log('Ripristino chat da sessionStorage:', JSON.parse(savedChat));
+        setChat(JSON.parse(savedChat));
+      } else {
+        console.log('Inizializzazione nuova chat');
+        setChat([
+          { sender: 'bot', text: INTRO_PHRASE }
+        ]);
+        updateTemplate('intro');
+      }
     }
   }, [location]);
 
   // Pulisci il sessionStorage quando si chiude la pagina
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (!keepChatActive) {
-        sessionStorage.removeItem('chatHistory');
-      }
+      // Rimuoviamo la pulizia automatica qui
+      // I dati verranno mantenuti durante la navigazione
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -142,7 +201,7 @@ function App() {
   useEffect(() => {
     if (exit) {
       setChatHistory([...chat]);
-      setChat([{ sender: 'bot', text: chat[chat.length - 1]?.text || '' }]);
+      // Non modifichiamo più la chat quando exit diventa true
     } else if (chatHistory.length > 0) {
       setChat([...chatHistory]);
       setChatHistory([]);
@@ -185,6 +244,7 @@ function App() {
         if (!TEMPLATES_OBBLIGATORI.includes(currentTemplate)) {
           try {
             setLoading(true);
+            console.log("handleKeyDown: Chiamata a get_summary in corso...");
             const response = await fetch('http://localhost:8000/get_summary', {
               method: 'GET',
               headers: {
@@ -205,7 +265,8 @@ function App() {
                   riepilogoData: data,
                   keepChatActive: true,
                   chatHistory: chat,
-                  currentTemplate: currentTemplate // Passa il template corrente
+                  currentTemplate: currentTemplate,
+                  fromApp: true
                 } 
               });
             }
@@ -265,12 +326,13 @@ function App() {
         return;
       }
       
-      const { guide_phrase, template_usato, nuovo_template, stato_conversazione, next_template, exit } = response.data
+      const { guide_phrase, template_usato, nuovo_template, stato_conversazione, next_template, exit, riepilogo } = response.data
       
       console.log('=== ANALISI RISPOSTA ===')
       console.log('Template usato:', template_usato)
       console.log('Next template:', next_template)
       console.log('Stato completo della risposta:', response.data)
+      console.log('Riepilogo:', riepilogo)
       
       // Aggiorna sempre il template con quello usato nella risposta
       if (template_usato) {
@@ -288,26 +350,16 @@ function App() {
         return;
       }
       
-      if (guide_phrase) {
-        await addBotMessage({ sender: 'bot', text: guide_phrase })
-      }
-        
-      if (!guide_phrase || guide_phrase.trim() === '') {
-        if (next_template) {
-          updateTemplate(next_template);
-        } else {
-          await addBotMessage({ sender: 'bot', text: '🎉 Tutte le informazioni sono state raccolte! Grazie per aver usato il nostro servizio.' })
-          setTimeout(() => {
-            navigate('/riepilogo');
-          }, 1000);
-        }
-      }
-
       // Gestione dei pulsanti di uscita
       if (exit) {
         console.log('=== GESTIONE EXIT ===')
         console.log('Stato exit prima dell\'aggiornamento:', exit)
         setExit(true)
+        setTempExitMessage(guide_phrase)
+        // Rimuovi l'ultimo messaggio dell'utente
+        setChat(prev => prev.slice(0, -1))
+        // Svuota l'input
+        setInput('')
         console.log('Stato exit dopo setExit(true):', true)
         console.log('Stato completo al momento dell\'exit:', {
           currentTemplate,
@@ -316,6 +368,27 @@ function App() {
         })
         setLoading(false)
         return
+      }
+      
+      // Aggiungi il messaggio del bot solo se non siamo in stato di exit
+      if (guide_phrase && !exit) {
+        await addBotMessage({ sender: 'bot', text: guide_phrase })
+      }
+        
+      if (!guide_phrase || guide_phrase.trim() === '') {
+        if (next_template) {
+          updateTemplate(next_template);
+        } else {
+          // Il backend gestirà il passaggio al riepilogo
+          await addBotMessage({ sender: 'bot', text: '🎉 Tutte le informazioni sono state raccolte! Grazie per aver usato il nostro servizio.' })
+        }
+      }
+      // Se riepilogo è true, chiamiamo handleResult
+      if (riepilogo === true) {
+        console.log('Riepilogo richiesto, chiamata a handleResult...');
+        updateTemplate('riepilogo');
+        await handleResult();
+        return;
       }
     } catch (err) {
       await addBotMessage({ sender: 'bot', text: err.response?.data?.detail || 'Errore nella richiesta' })
@@ -328,6 +401,8 @@ function App() {
   const handleResult = async () => {
     try {
       setLoading(true)
+      setTempExitMessage(null) // Rimuovi il messaggio di exit
+      console.log("handleResult: Chiamata a get_summary in corso...");
       const response = await fetch('http://localhost:8000/get_summary', {
         method: 'GET',
         headers: {
@@ -348,28 +423,44 @@ function App() {
             riepilogoData: data,
             keepChatActive: true,
             chatHistory: chat,
-            currentTemplate: currentTemplate // Passa il template corrente
+            currentTemplate: currentTemplate,
+            fromApp: true
           } 
         });
+        console.log('Navigazione completata');
       } else {
         console.log('Nessun riepilogo da mostrare');
       }
       
-      setLoading(false)
-      setExit(false)
+      setLoading(false);
+      setExit(false);
+      console.log('=== FINE HANDLE_RESULT ===');
     } catch (error) {
-      console.error('Errore durante il recupero dei risultati:', error)
-      setLoading(false)
+      console.error('=== ERRORE IN HANDLE_RESULT ===');
+      console.error('Dettagli errore:', error);
+      console.error('Stato al momento dell\'errore:', {
+        currentTemplate,
+        statoConversazione,
+        exit,
+        chatLength: chat.length
+      });
+      setLoading(false);
     }
   }
 
   const handleSkipTemplate = async () => {
     try {
       setLoading(true)
+      setTempExitMessage(null) // Rimuovi il messaggio di exit
       const response = await axios.post('http://localhost:8000/skip_template')
       
+      setChat(prev => [...prev, { role: 'assistant', text: response.data.guide_phrase }])
+      updateTemplate(response.data.template_usato);
+      updateStatoConversazione(response.data.stato_conversazione);
+      setStatoConversazione_context(response.data.stato_conversazione);
       if (response.data?.show_summary === true && response.data?.data) {
         setExit(true);
+        updateTemplate('riepilogo');
         navigate('/riepilogo', { 
           state: { 
             riepilogoData: response.data.data,
@@ -380,11 +471,6 @@ function App() {
         setLoading(false);
         return;
       }
-      
-      setChat(prev => [...prev, { role: 'assistant', text: response.data.guide_phrase }])
-      updateTemplate(response.data.template_usato);
-      updateStatoConversazione(response.data.stato_conversazione);
-      setStatoConversazione_context(response.data.stato_conversazione);
       setExit(false)
       setLoading(false)
     } catch (error) {
@@ -403,6 +489,7 @@ function App() {
       })
       
       setLoading(true)
+      setTempExitMessage(null) // Rimuovi il messaggio di exit
       console.log('Chiamata a get_continue...')
       const response = await axios.get('http://localhost:8000/get_continue')
       console.log('Risposta ricevuta:', response.data)
@@ -441,19 +528,6 @@ function App() {
       exit
     })
   }, [exit])
-
-  // Aggiungo l'event listener per la chiusura
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      clearAllData();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      clearAllData(); // Pulisce anche quando il componente viene smontato
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -550,6 +624,30 @@ function App() {
                     )}
                   </div>
                 ))}
+                {tempExitMessage && (
+                  <div
+                    style={{
+                      textAlign: 'left',
+                      margin: '8px 0',
+                      opacity: 0.7,
+                      transition: 'opacity 0.3s ease-in-out'
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        background: '#e2e3e5',
+                        color: '#222',
+                        borderRadius: 16,
+                        padding: '8px 16px',
+                        maxWidth: '80%',
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {tempExitMessage}
+                    </span>
+                  </div>
+                )}
                 {exit && (
                   <div className="flex flex-wrap gap-2 justify-center mt-4">
                     <button
@@ -587,11 +685,11 @@ function App() {
                   onChange={e => setInput(e.target.value)}
                   placeholder="Scrivi qui la tua richiesta..."
                   style={{ flex: 1, borderRadius: 8, padding: 8 }}
-                  disabled={loading || exit}
+                  disabled={loading || exit || currentTemplate === 'riepilogo'}
                 />
                 <button 
                   type="submit" 
-                  disabled={loading || !input.trim() || exit}
+                  disabled={loading || !input.trim() || exit || currentTemplate === 'riepilogo'}
                   style={{ 
                     background: '#4a90e2', 
                     color: '#fff', 
