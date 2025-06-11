@@ -1,6 +1,7 @@
 """
-Libreria per la gestione delle interazioni con Ollama
-Utilizza il modello Qwen3 per generare risposte personalizzate
+Libreria per la gestione delle interazioni con Ollama.
+Utilizza il modello Qwen3 ("qwen3:1.7b") tramite Ollama per generare risposte in linguaggio naturale.
+Le risposte sono sempre formulate in italiano.
 """
 
 import requests

@@ -1,4 +1,3 @@
-
 [![Test Coverage](https://img.shields.io/badge/coverage-76.27%25-brightgreen)](coverage.txt)
 [![Python Version](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
@@ -9,7 +8,31 @@
 
 # RouteToWonderland
 
-RouteToWonderland è una piattaforma intelligente per la creazione di viaggi personalizzati, pensata per agenzie di viaggio e utenti finali. Il sistema sfrutta l'intelligenza artificiale per estrarre automaticamente le informazioni chiave da richieste testuali e guidare l'utente nella pianificazione di un viaggio su misura.
+RouteToWonderland è una piattaforma all'avanguardia che trasforma la pianificazione dei viaggi attraverso l'intelligenza artificiale. Combinando il modello NuExtract 2.0 di estrazione dati con un sistema di conversazione naturale basato su Qwen3, la piattaforma offre un'esperienza di pianificazione viaggi completamente automatizzata e personalizzata.
+
+Progettata sia per agenzie di viaggio che per viaggiatori individuali, RouteToWonderland analizza automaticamente le richieste, estrae informazioni chiave e guida l'utente attraverso un processo di pianificazione intuitivo. La piattaforma si distingue per la sua capacità di comprendere il contesto, adattarsi alle preferenze specifiche e generare suggerimenti pertinenti, tutto questo attraverso un'interfaccia moderna e reattiva.
+
+## Caratteristiche distintive
+
+- 🤖 **Intelligenza Artificiale Avanzata**: 
+  - Doppio sistema AI che combina estrazione intelligente di informazioni e generazione di risposte naturali
+  - Modello NuExtract per l'analisi precisa delle richieste
+  - Integrazione con Qwen3 per conversazioni fluide e contestuali
+
+- 🎯 **Personalizzazione senza precedenti**:
+  - Analisi automatica delle preferenze e dei requisiti
+  - Suggerimenti intelligenti basati sul contesto
+  - Adattamento dinamico alle esigenze specifiche
+
+- 💡 **Interfaccia moderna e intuitiva**:
+  - Design reattivo ottimizzato per tutti i dispositivi
+  - Esperienza utente fluida e coinvolgente
+  - Navigazione semplice e guidata
+
+- 🔒 **Sicurezza e affidabilità**:
+  - Elaborazione locale dei dati sensibili
+  - Architettura robusta e scalabile
+  - Performance ottimizzate
 
 ---
 
@@ -48,6 +71,7 @@ RouteToWonderland è una piattaforma intelligente per la creazione di viaggi per
   - FastAPI  
   - Pydantic  
   - Modello AI custom (locale, non incluso nel repository)
+  - Ollama con modello Qwen3 ("qwen3:1.7b") per la generazione di risposte in linguaggio naturale
 
 ---
 
@@ -107,7 +131,23 @@ pip install nomic psycopg2-binary pgvector
 
 ### Note modello AI
 
-Assicurati che la cartella `NuExtract-2-xB-experimental` contenga il modello AI (non incluso nel repository).
+Il sistema utilizza due modelli AI principali:
+
+1. **NuExtract-2-xB-experimental**:
+   - Modello locale per l'estrazione delle entità e la comprensione del linguaggio naturale
+   - Non incluso nel repository per motivi di dimensione e proprietà intellettuale
+   - Deve essere posizionato nella cartella `backend/NuExtract-2-xB-experimental`
+
+2. **Ollama con Qwen3**:
+   - Utilizza il modello "qwen3:1.7b" tramite Ollama per la generazione di risposte in linguaggio naturale
+   - Richiede l'installazione di Ollama sul sistema
+   - Genera risposte in italiano per la conversazione con l'utente
+   - Configurato per operare su `localhost:11434`
+
+Per il corretto funzionamento, assicurati di:
+- Avere i file del modello NuExtract nella posizione corretta
+- Aver installato e avviato Ollama sul sistema
+- Aver scaricato il modello Qwen3 tramite Ollama (`ollama pull qwen3:1.7b`)
 
 ---
 
