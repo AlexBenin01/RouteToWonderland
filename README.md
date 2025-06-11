@@ -1,6 +1,6 @@
 [![Test Coverage](https://img.shields.io/badge/coverage-76.27%25-brightgreen)](coverage.txt)
 [![Python Version](https://img.shields.io/badge/python-3.10-blue)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Status](https://img.shields.io/badge/status-active-success)]()
 [![Last Commit](https://img.shields.io/github/last-commit/AlexBenin01/RouteToWonderland)]()
 [![Open Issues](https://img.shields.io/github/issues/AlexBenin01/RouteToWonderland)]()
@@ -72,6 +72,20 @@ Progettata sia per agenzie di viaggio che per viaggiatori individuali, RouteToWo
   - Pydantic  
   - Modello AI custom (locale, non incluso nel repository)
   - Ollama con modello Qwen3 ("qwen3:1.7b") per la generazione di risposte in linguaggio naturale
+
+### Database e Embedding
+
+- **Database PostgreSQL**:
+  - Database relazionale per la gestione dei dati strutturati
+  - File `routeToWonderland.sql` contiene la struttura completa del database e dati di esempio
+  - Estensione pgvector per supportare operazioni con vettori
+
+- **Sistema di Embedding**:
+  - Utilizza il modello nomic-embed-text-v1.5 per generare embedding semantici
+  - Converte testo in vettori 768-dimensionali per ricerca semantica
+  - Applicato a vari campi come destinazioni, attività, alloggi, ecc.
+  - Permette ricerche semantiche avanzate nel database
+  - Gli embedding vengono generati e salvati automaticamente nel database
 
 ---
 
