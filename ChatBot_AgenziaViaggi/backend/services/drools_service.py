@@ -14,12 +14,19 @@ class DroolsService:
     def _convert_to_camel_case(data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Converte i nomi dei campi da snake_case a camelCase.
+        Mantiene il case originale per le chiavi già in camelCase.
         """
         result = {}
         for key, value in data.items():
-            # Converti il nome del campo in camelCase
-            camel_key = ''.join(word.capitalize() if i > 0 else word.lower() 
-                              for i, word in enumerate(key.split('_')))
+            # Se la chiave contiene underscore, la converte in camelCase
+            if '_' in key:
+                # Dividi la chiave in parole
+                words = key.split('_')
+                # La prima parola in minuscolo, le altre con la prima lettera maiuscola
+                camel_key = words[0].lower() + ''.join(word.capitalize() for word in words[1:])
+            else:
+                # Altrimenti mantiene il case originale
+                camel_key = key
             result[camel_key] = value
         return result
 

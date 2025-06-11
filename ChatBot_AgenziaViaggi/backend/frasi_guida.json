@@ -3,23 +3,23 @@
         "tipo_alloggio": "Che tipo di sistemazione preferisci? Scegli tra: hotel, resort, campeggio o villaggio turistico"
     },
     "avventura": {
-        "attivita": "Quali attività avventurose ti interessano? Scegli tra: rafting, arrampicata, trekking",
-        "livello_difficoltà": "Che livello di difficoltà preferisci? (principiante, intermedio, avanzato)",
-        "guida_menzionata": "Preferisci una guida esperta per le attività?",
-        "guida_esperta": "Preferisci una guida esperta per le attività?",
-        "lingua_guida": "In quale lingua preferisci la guida?"
+        "attivita": "Ci sono diverse attività che puoi scegliere. Scegli tra: rafting, arrampicata, trekking",
+        "livello_difficoltà": "A quale livello di difficoltà vuoi affrontare l'attività scelta? (principiante, intermedio, avanzato)",
+        "guida_menzionata": "Vorresti essere accompagnato da un guida esperta per le attività che hai scelto?",
+        "guida_esperta": "Vorresti essere accompagnato da un guida esperta per le attività che hai scelto?",
+        "lingua_guida": "Che lingua deve essere parlata dalla guida?"
     },
     "benessere": {
         "trattamenti": "Quali trattamenti ti piacerebbe provare? Scegli tra: massaggi, fango, idromassaggio"
     },
     "citta_arte": {
-        "attivita": "Quali attività culturali ti interessano? Scegli tra: museo, galleria, tour",
-        "guida_menzionata": "Preferisci una guida turistica per le visite?",
-        "guida_turistica": "Preferisci una guida turistica per le visite?",
-        "lingua_guida": "In quale lingua preferisci la guida?"
+        "attivita": "Ci sono diverse attività culturali che puoi scegliere. Scegli tra: museo, galleria, tour",
+        "guida_menzionata": "Vorresti essere accompagnato da un guida turistica per le visite?",
+        "guida_turistica": "Vorresti essere accompagnato da un guida turistica per le visite?",
+        "lingua_guida": "Che lingua deve essere parlata dalla guida?"
     },
     "contatti": {
-        "full_name": "Per procedere con la prenotazione, potresti dirmi il tuo nome e cognome?",
+        "full_name": "Potresti scrivermi il tuo nome e cognome?",
         "email": "Qual è il tuo indirizzo email per ricevere i dettagli del viaggio?",
         "numero_cellulare": "Per eventuali comunicazioni urgenti, potresti lasciarmi il tuo numero di telefono?",
         "codice_fiscale_o_partita_iva": "Per completare la prenotazione, avrei bisogno del tuo codice fiscale o partita IVA"
@@ -30,36 +30,36 @@
     },
     "gastronomia": {
         "corsi_cucina": "Ti piacerebbe partecipare a corsi di cucina?",
-        "degustazioni": "Quali tipi di degustazioni ti interessano? Scegli tra: vini, formaggi, olio, pane, cioccolato"
+        "degustazioni": "Vorresti partecipare a degustazioni di prodotti locali? Scegli tra: vini, formaggi, olio, pane, cioccolato"
     },
     "intro": {
         "nazione_destinazione": "Benvenuto! Per iniziare a pianificare il tuo viaggio perfetto, dimmi in quale nazione vorresti andare?",
         "regione_citta_destinazione": "Perfetto! Ora, quale regione o città specifica ti piacerebbe visitare?",
         "departure_date": "Quando vorresti partire?",
         "numero_partecipanti": "Quante persone parteciperanno a questo viaggio?",
-        "tipo_partecipanti": "Con chi viaggerai? Scegli tra: adulti, anziani o famiglia",
+        "tipo_partecipanti": "Con chi viaggerai? Scegli tra: adulti o famiglia",
         "trip_duration": "Per quanti giorni vorresti rimanere?",
         "mood_vacanza": "Che tipo di esperienza stai cercando? Scegli tra: avventura, cultura, benessere, mare, montagna, città d'arte, famiglia, naturalistico o gastronomia",
         "budget_viaggio": "Qual è il tuo budget complessivo per il viaggio? Inserisci l'importo in euro"
     },
     "mare": {
-        "attivita": "Quali attività al mare ti interessano? Scegli tra: snorkeling, windsurf, subacquea",
+        "attivita": "Ci sono diverse attività al mare che puoi scegliere. Scegli tra: snorkeling, windsurf, subacquea",
         "attrezzatura_menzionata": "Hai già l'attrezzatura necessaria?",
         "attrezzatura": "Hai già l'attrezzatura necessaria?"
     },
     "montagna": {
-        "attivita": "Quali attività in montagna ti interessano? Scegli tra: sci, snowboard, ciaspolate, escursioni, visita rifugi",
+        "attivita": "Ci sono diverse attività in montagna che puoi scegliere. Scegli tra: sci, snowboard, ciaspolate, escursioni, visita rifugi",
         "attrezzatura_menzionata": "Hai già l'attrezzatura necessaria?",
         "attrezzatura": "Hai già l'attrezzatura necessaria?"
     },
     "naturalistico": {
-        "attivita": "Quali attività naturalistiche ti interessano? Scegli tra: birdwatching, safari, trekking",
+        "attivita": "Ci sono diverse attività naturalistiche che puoi scegliere. Scegli tra: birdwatching, safari, trekking",
         "guida_menzionata": "Vuoi che ti suggerisca una guida per le attività?",
         "guida_esperta": "Preferisci una guida esperta per le attività?",
         "lingua_guida": "In quale lingua preferisci la guida?"
     },
     "noleggi": {
-        "posti_auto": "Quanti posti auto ti servono?",
+        "posti_auto": "quanti posti a sedere ti servono per la tua auto?",
         "tipo_cambio": "Che tipo di cambio preferisci? (manuale o automatico)"
     },
     "trasporto": {
