@@ -1,9 +1,9 @@
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\controller\PreferenceController.java
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\model\TravelPreference.java
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\DroolsApplication.java
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\controller\ScontoController.java
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\service\RuleService.java
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\service\ScontoService.java
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\config\DroolsConfig.java
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\model\RichiestaSconto.java
-C:\Users\aless\Desktop\ChatBot_AgenziaViaggi - Copia\drools-service\src\main\java\com\routetowonderland\drools\model\RispostaSconto.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\controller\PreferenceController.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\controller\ScontoController.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\model\TravelPreference.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\DroolsApplication.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\model\RichiestaSconto.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\service\RuleService.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\config\DroolsConfig.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\model\RispostaSconto.java
+C:\Users\aless\Desktop\RouteToWonderland\drools-service\src\main\java\com\routetowonderland\drools\service\ScontoService.java
