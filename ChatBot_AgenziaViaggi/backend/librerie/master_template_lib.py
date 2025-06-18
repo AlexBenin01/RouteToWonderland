@@ -63,8 +63,8 @@ class MasterTemplateManager:
             logger.info(f"Testo ricevuto: {text}")
             logger.info(f"Template master attuale: {self.template_master}")
             
-            self.model_path = './NuExtract-2-2B-experimental'  # Percorso del modello NuExtract
-            logger.info(f"Percorso modello: {self.model_path}")
+            #self.model_path = './NuExtract-2.0-2B'  # Percorso del modello NuExtract
+            #logger.info(f"Percorso modello: {self.model_path}")
             
             
             # Converti il template vuoto in JSON
@@ -75,8 +75,7 @@ class MasterTemplateManager:
             logger.info("Chiamata a extract_entities...")
             result = extract_entities(
                 text=text,
-                template=template_json,
-                model_path=self.model_path
+                template=template_json
             )
             
             logger.info(f"Tipo di risultato: {type(result)}")

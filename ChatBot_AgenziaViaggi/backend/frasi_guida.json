@@ -5,8 +5,8 @@
     "avventura": {
         "attivita": "Ci sono diverse attività che puoi scegliere. Scegli tra: rafting, arrampicata, trekking",
         "livello_difficoltà": "A quale livello di difficoltà vuoi affrontare l'attività scelta? (principiante, intermedio, avanzato)",
-        "guida_menzionata": "Vorresti essere accompagnato da un guida esperta per le attività che hai scelto?",
-        "guida_esperta": "Vorresti essere accompagnato da un guida esperta per le attività che hai scelto?",
+        "guida_menzionata": "Nelle tue attività vorresti essere accompagnato da un guida esperta?",
+        "guida_esperta": "Nelle tue attività vorresti essere accompagnato da un guida esperta?",
         "lingua_guida": "Che lingua deve essere parlata dalla guida?"
     },
     "benessere": {
@@ -14,15 +14,15 @@
     },
     "citta_arte": {
         "attivita": "Ci sono diverse attività culturali che puoi scegliere. Scegli tra: museo, galleria, tour",
-        "guida_menzionata": "Vorresti essere accompagnato da un guida turistica per le visite?",
-        "guida_turistica": "Vorresti essere accompagnato da un guida turistica per le visite?",
-        "lingua_guida": "Che lingua deve essere parlata dalla guida?"
+        "guida_menzionata": "Nelle tue visite vorresti essere accompagnato da un guida turistica?",
+        "guida_turistica": "Nelle tue visite vorresti essere accompagnato da un guida turistica?",
+        "lingua_guida": "Che lingua deve sapere parlare la guida?"
     },
     "contatti": {
         "full_name": "Potresti scrivermi il tuo nome e cognome?",
         "email": "Qual è il tuo indirizzo email per ricevere i dettagli del viaggio?",
         "numero_cellulare": "Per eventuali comunicazioni urgenti, potresti lasciarmi il tuo numero di telefono?",
-        "codice_fiscale_o_partita_iva": "Per completare la prenotazione, avrei bisogno del tuo codice fiscale o partita IVA"
+        "codice_fiscale_o_partita_iva": "Per completare la prenotazione, ci servirebbe il tuo codice fiscale o partita IVA"
     },
     "famiglia": {
         "adulti": "Quanti adulti parteciperanno al viaggio?",
@@ -54,9 +54,9 @@
     },
     "naturalistico": {
         "attivita": "Ci sono diverse attività naturalistiche che puoi scegliere. Scegli tra: birdwatching, safari, trekking",
-        "guida_menzionata": "Vuoi che ti suggerisca una guida per le attività?",
-        "guida_esperta": "Preferisci una guida esperta per le attività?",
-        "lingua_guida": "In quale lingua preferisci la guida?"
+        "guida_menzionata": "Nelle tue attività vorresti essere accompagnato da un guida esperta?",
+        "guida_esperta": "Nelle tue attività vorresti essere accompagnato da un guida esperta?",
+        "lingua_guida": "Che lingua deve saper parlare la guida?"
     },
     "noleggi": {
         "posti_auto": "quanti posti a sedere ti servono per la tua auto?",

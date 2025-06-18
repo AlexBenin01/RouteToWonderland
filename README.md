@@ -133,6 +133,8 @@ pip install sentence_transformers
 pip install tiktoken
 pip install torchvision
 pip install sentencepiece
+pip install langdetect
+pip install qwen_vl_utils
 pip install "torch>=2.1" "nncf>=2.7" "transformers>=4.40.0" "onnx<1.16.2" "optimum>=1.16.1" "accelerate" "datasets>=2.14.6" "git+https://github.com/huggingface/optimum-intel.git" --extra-index-url https://download.pytorch.org/whl/cpu
 pip install fastapi uvicorn
 ```
@@ -147,10 +149,10 @@ pip install nomic psycopg2-binary pgvector
 
 Il sistema utilizza due modelli AI principali:
 
-1. **NuExtract-2-xB-experimental**:
+1. **NuExtract-2.0-xB**:
    - Modello locale per l'estrazione delle entità e la comprensione del linguaggio naturale
    - Non incluso nel repository per motivi di dimensione e proprietà intellettuale
-   - Deve essere posizionato nella cartella `backend/NuExtract-2-xB-experimental`
+   - Deve essere posizionato nella cartella `backend/NuExtract-2.0-xB`
 
 2. **Ollama con Qwen3**:
    - Utilizza il modello "qwen3:1.7b" tramite Ollama per la generazione di risposte in linguaggio naturale

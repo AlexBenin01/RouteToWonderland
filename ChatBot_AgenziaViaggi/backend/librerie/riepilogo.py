@@ -40,15 +40,18 @@ def algoritmoABC(totale_speso: float, fatturato_annuale: float) -> str:
         # Chiamata al servizio Drools
         logger.info("Inizio chiamata al servizio Drools")
         logger.debug(f"URL Drools: http://localhost:8080/api/calcola-sconto")
+        logger.debug(f"Payload completo: {payload}")
         
         start_time = time.time()
         response = requests.post(
             "http://localhost:8080/api/calcola-sconto",
-            json=payload
+            json=payload,
+            timeout=10  # Timeout di 10 secondi
         )
         end_time = time.time()
         
         logger.debug(f"Tempo di risposta Drools: {end_time - start_time:.2f} secondi")
+        logger.debug(f"Status code ricevuto: {response.status_code}")
         
         if response.status_code == 200:
             risultato = response.json()
@@ -405,7 +408,7 @@ def process_contatti(template_data: Dict[str, Any]) -> str:
             # Verifica se esiste il profilo usando il codice fiscale o partita IVA
             cursor.execute("SELECT budget_tot_speso FROM clienti WHERE identificativo = %s", (identificativo,))
             risultato = cursor.fetchone()
-            
+            logger.info(f"risultato: {risultato}")
             # Query per ottenere il fatturato dell'anno corrente
             cursor.execute("""
                 SELECT importo_annuale 
@@ -444,7 +447,7 @@ def process_contatti(template_data: Dict[str, Any]) -> str:
                 
                 # Per un nuovo profilo, il grado sconto sarà sempre C
                 logger.info(f"Nuovo profilo creato per identificativo {identificativo} con budget inizializzato a 0")
-                return "C"
+                return "B"
                 
         finally:
             cursor.close()

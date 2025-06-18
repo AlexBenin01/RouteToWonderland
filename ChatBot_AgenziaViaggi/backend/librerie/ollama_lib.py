@@ -38,7 +38,7 @@ class OllamaManager:
             print(f"Errore nel caricamento delle frasi guida: {str(e)}")
             return {}
         
-    def _create_prompt(self, template_type: str, template: Dict[str, Any]) -> str:
+    def _create_prompt(self, template_type: str, template: Dict[str, Any], lingua: str = "it") -> str:
         """Restituisce la frase guida per il prossimo campo da compilare"""
         # Se il template è vuoto, restituisci la frase guida per il primo campo del template
         logging.getLogger(__name__).info(f"Template: {template}")
@@ -73,32 +73,51 @@ class OllamaManager:
             f"Per favore, fornisci informazioni per il campo {next_field}"
         )
         
+        lingua_sistema = self._get_lingua_sistema(lingua)
+        
         # Costruisci il prompt completo
-        prompt = f"""Sei un assistente di viaggio esperto e cordiale. Il tuo compito è fare domande per raccogliere informazioni sul viaggio.
+        prompt = f"""Sei un assistente di viaggio esperto e amichevole. Il tuo compito è raccogliere informazioni utili facendo domande mirate.
 
-Contesto attuale:
-{context_str}
+Ecco il contesto attuale:
+"{context_str}"
 
-Devi chiedere informazioni per il campo: {next_field}
-Frase guida di riferimento: {frase_guida}
+Devi chiedere qualcosa per completare il campo successivo: {next_field}
+Usa questa frase guida come ispirazione: "{frase_guida}"
 
-IMPORTANTE: NON ripetere la frase guida. Invece, formula una domanda naturale e conversazionale basata sulla frase guida.
-La domanda deve essere:
-- In italiano
-- Diretta e specifica
-- Naturale e conversazionale
-- Pertinente al contesto fornito
+Regole importanti:
 
-Ora, formula la tua domanda:"""
+Non copiare la frase guida, ma riformulala in modo naturale e colloquiale.
+La domanda deve essere in {lingua_sistema}.
+Deve risultare conversazionale , non formale o robotica.
+Deve essere diretta e specifica , coerente con il contesto fornito.
+Ora, genera una domanda che segua queste indicazioni:
+
+"""
         
         return prompt
 
-    def get_response(self, template_type: str, template: Dict[str, Any]) -> str:
+    def _get_lingua_sistema(self, lingua: str) -> str:
+        """Converte il codice lingua in nome della lingua per il sistema"""
+        lingua_map = {
+            "it": "italiano",
+            "en": "inglese", 
+            "es": "spagnolo",
+            "fr": "francese",
+            "de": "tedesco",
+            "pt": "portoghese"
+        }
+        return lingua_map.get(lingua, "italiano")
+
+    def get_response(self, template_type: str, template: Dict[str, Any], lingua: str = "it") -> str:
         """Ottiene una risposta personalizzata da Ollama"""
         try:
-            prompt = self._create_prompt(template_type, template)
+            prompt = self._create_prompt(template_type, template, lingua)
             logging.getLogger(__name__).info(f"Frase guida inviata ad Ollama: {prompt}")
             logging.getLogger(__name__).info(f"Template aggiornato: {json.dumps(template, ensure_ascii=False, indent=2)}")
+            
+            # Determina la lingua per il sistema
+            lingua_sistema = self._get_lingua_sistema(lingua)
+            
             response = requests.post(
                 f"{self.base_url}/generate",
                 json={
@@ -106,10 +125,10 @@ Ora, formula la tua domanda:"""
                     "prompt": prompt,
                     "stream": False,
                     "options": {
-                        "temperature": 0.7,
+                        "temperature": 0.4,
                         "top_p": 0.9,
                         "top_k": 40,
-                        "system": "Sei un assistente di viaggio esperto e cordiale. Rispondi sempre in italiano."
+                        "system": f"Sei un assistente di viaggio esperto e cordiale. Rispondi sempre in {lingua_sistema}."
                     }
                 }
             )
@@ -142,13 +161,15 @@ Ora, formula la tua domanda:"""
         except:
             return False 
         
-    def get_exit(self) -> str:
+    def get_exit(self, lingua: str = "it") -> str:
         """Restituisce una frase guida per chiedere se concludere la conversazione"""
         try:
-            prompt = """Sei un assistente di viaggio esperto e cordiale. Il tuo compito è chiedere all'utente se desidera concludere la conversazione.
+            lingua_sistema = self._get_lingua_sistema(lingua)
+            
+            prompt = f"""Sei un assistente di viaggio esperto e cordiale. Il tuo compito è chiedere all'utente se desidera concludere la conversazione.
 
 IMPORTANTE:
-- La domanda deve essere in italiano
+- La domanda deve essere in {lingua_sistema}
 - Deve essere naturale e conversazionale
 - Deve dare l'impressione che l'assistente sia disponibile a continuare se l'utente lo desidera
 - Non deve essere troppo diretta o brusca
@@ -165,7 +186,7 @@ Ora, formula la tua domanda:"""
                         "temperature": 0.7,
                         "top_p": 0.9,
                         "top_k": 40,
-                        "system": "Sei un assistente di viaggio esperto e cordiale. Rispondi sempre in italiano."
+                        "system": f"Sei un assistente di viaggio esperto e cordiale. Rispondi sempre in {lingua_sistema}."
                     }
                 }
             )
@@ -181,16 +202,30 @@ Ora, formula la tua domanda:"""
             else:
                 return f"Errore nella comunicazione con Ollama: {response.status_code}"
         except Exception as e:
-            return f"Si è verificato un errore: {str(e)}" 
+            return f"Si è verificato un errore: {str(e)}"
     
-    def campi_obbligatori(self) -> str:
+    def campi_obbligatori(self, lingua: str = "it") -> str:
         """Restituisce una frase guida per chiedere se concludere la conversazione"""
         try:
-            prompt = """Sei un assistente di viaggio esperto e cordiale. Il tuo compito è comunicare all'utente che ci sono ancora domande obbligatorie da completare.
+            lingua_sistema = self._get_lingua_sistema(lingua)
+            
+            # Messaggi per diverse lingue
+            messaggi = {
+                "it": "Abbiamo ancora delle domande obbligatorie prima di passare alla fattura di viaggio",
+                "en": "We still have mandatory questions before proceeding to the travel invoice",
+                "es": "Todavía tenemos preguntas obligatorias antes de proceder con la factura de viaje",
+                "fr": "Nous avons encore des questions obligatoires avant de procéder à la facture de voyage",
+                "de": "Wir haben noch obligatorische Fragen, bevor wir zur Reiseabrechnung übergehen",
+                "pt": "Ainda temos perguntas obrigatórias antes de prosseguir com a fatura de viagem"
+            }
+            
+            messaggio = messaggi.get(lingua, messaggi["it"])
+            
+            prompt = f"""Sei un assistente di viaggio esperto e cordiale. Il tuo compito è comunicare all'utente che ci sono ancora domande obbligatorie da completare.
 
 IMPORTANTE:
-- La risposta deve essere: "Abbiamo ancora delle domande obbligatorie prima di passare alla fattura di viaggio"
-- La risposta deve essere in italiano
+- La risposta deve essere: "{messaggio}"
+- La risposta deve essere in {lingua_sistema}
 - Non modificare la frase fornita
 - Non aggiungere altro testo
 
@@ -206,7 +241,7 @@ Ora, formula la tua risposta:"""
                         "temperature": 0.7,
                         "top_p": 0.9,
                         "top_k": 40,
-                        "system": "Sei un assistente di viaggio esperto e cordiale. Rispondi sempre in italiano."
+                        "system": f"Sei un assistente di viaggio esperto e cordiale. Rispondi sempre in {lingua_sistema}."
                     }
                 }
             )

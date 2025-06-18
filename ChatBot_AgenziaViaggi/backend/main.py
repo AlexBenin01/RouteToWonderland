@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import json
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
+from langdetect import detect, LangDetectException
 from librerie.ollama_lib import OllamaManager
 from librerie.NuEstractLib import NuExtract
 from librerie.intro_lib import IntroTemplate
@@ -62,6 +63,9 @@ CONTESTO_CONVERSAZIONE = {}
 
 # Contatore per le richieste di uscita
 EXIT_COUNTER = 0
+
+# Variabile globale per la lingua corrente (inizializzata in italiano)
+LINGUA = "it"
 
 # Lista dei template obbligatori
 TEMPLATE_OBBLIGATORI = ["intro", "contatti", "trasporto"]
@@ -157,6 +161,34 @@ def get_empty_template(template: Dict[str, Any]) -> Dict[str, Any]:
     """
     return {k: normalize_template_value(v) for k, v in template.items()}
 
+def rileva_lingua(testo: str) -> str:
+    """
+    Rileva la lingua del testo e aggiorna la variabile globale LINGUA
+    
+    Args:
+        testo: Il testo da analizzare
+        
+    Returns:
+        str: Il codice della lingua rilevata
+    """
+    global LINGUA
+    
+    try:
+        if testo and len(testo.strip()) > 0:
+            lingua_rilevata = detect(testo)
+            logger.info(f"Lingua rilevata per il testo: {lingua_rilevata}")
+            LINGUA = lingua_rilevata
+            return lingua_rilevata
+        else:
+            logger.info(f"Testo vuoto o troppo corto, mantengo lingua corrente: {LINGUA}")
+            return LINGUA
+    except LangDetectException as e:
+        logger.warning(f"Errore nel rilevamento della lingua: {str(e)}, mantengo lingua corrente: {LINGUA}")
+        return LINGUA
+    except Exception as e:
+        logger.error(f"Errore imprevisto nel rilevamento della lingua: {str(e)}, mantengo lingua corrente: {LINGUA}")
+        return LINGUA
+
 def aggiorna_contesto_conversazione(template_attivo: str, messaggio_utente: str, risposta_bot: str):
     """
     Aggiorna il contesto della conversazione per il template attivo
@@ -209,12 +241,16 @@ def get_contesto_conversazione(template_attivo: str) -> str:
 
 @app.post("/extract_simple")
 async def extract_simple(request: SimpleRequest):
-    global STATO_CONVERSAZIONE_JSON, EXIT_COUNTER
+    global STATO_CONVERSAZIONE_JSON, EXIT_COUNTER, LINGUA
     
     logger.info("\n=== INIZIO RICHIESTA EXTRACT_SIMPLE ===")
     logger.info(f"Testo ricevuto: {request.text}")
     logger.info(f"Template attivo: {template_manager.active_template}")
     logger.info(f"Sequenza template: {template_manager.get_template_sequence()}")
+    
+    # Rileva la lingua del testo ricevuto
+    lingua_rilevata = rileva_lingua(request.text)
+    logger.info(f"Lingua corrente: {LINGUA}")
     
     try:
         # Carica lo stato attuale
@@ -303,7 +339,7 @@ async def extract_simple(request: SimpleRequest):
                 logger.info("Richiesta di uscita o nessuna modifica per due volte consecutive")
                 if template_manager.active_template in TEMPLATE_OBBLIGATORI:
                     logger.info("Template obbligatorio, invio risposta personalizzata")
-                    risposta = ollama_manager.campi_obbligatori()
+                    risposta = ollama_manager.campi_obbligatori(lingua=LINGUA)
                     response = {
                         "guide_phrase": risposta,
                         "template_usato": template_manager.active_template,
@@ -316,7 +352,7 @@ async def extract_simple(request: SimpleRequest):
                 else:
                     logger.info("Richiesta di uscita template_exit:True")
                     EXIT_COUNTER = 0  # Reset del contatore se è una richiesta di uscita valida
-                    risposta = ollama_manager.get_exit()
+                    risposta = ollama_manager.get_exit(lingua=LINGUA)
                     logger.info(risposta)
                     response = {
                         "guide_phrase": risposta,
@@ -333,7 +369,7 @@ async def extract_simple(request: SimpleRequest):
                     logger.info("Raggiunto il limite di tentativi, verifica se template obbligatorio")
                     if template_manager.active_template in TEMPLATE_OBBLIGATORI:
                         logger.info("Template obbligatorio, invio risposta personalizzata")
-                        risposta = ollama_manager.campi_obbligatori()
+                        risposta = ollama_manager.campi_obbligatori(lingua=LINGUA)
                         response = {
                             "guide_phrase": risposta,
                             "template_usato": template_manager.active_template,
@@ -345,7 +381,7 @@ async def extract_simple(request: SimpleRequest):
                         return response
                     else:
                         logger.info("Richiesta di uscita")
-                        risposta = ollama_manager.get_exit()
+                        risposta = ollama_manager.get_exit(lingua=LINGUA)
                         logger.info(risposta)
                         response = {
                             "guide_phrase": risposta,
@@ -360,7 +396,8 @@ async def extract_simple(request: SimpleRequest):
                     logger.info(f"Tentativo {EXIT_COUNTER} di 2, continuo con la conversazione")
                     risposta = ollama_manager.get_response(
                         template_type=template_manager.active_template,
-                        template=template_aggiornato
+                        template=template_aggiornato,
+                        lingua=LINGUA
                     )
                     response = {
                         "guide_phrase": risposta,
@@ -493,7 +530,8 @@ async def extract_simple(request: SimpleRequest):
                     try:
                         risposta = ollama_manager.get_response(
                             template_type=template_manager.active_template,
-                            template=empty_template
+                            template=empty_template,
+                            lingua=LINGUA
                         )
                         logger.info(f"Risposta per il nuovo template: {risposta}")
                     except Exception as e:
@@ -530,7 +568,8 @@ async def extract_simple(request: SimpleRequest):
             logger.info("Richiesta risposta a Ollama")
             risposta = ollama_manager.get_response(
                 template_type=template_manager.active_template,
-                template=template_aggiornato
+                template=template_aggiornato,
+                lingua=LINGUA
             )
             logger.info(f"Risposta ottenuta da Ollama: {risposta}")
         except Exception as ollama_error:
@@ -630,10 +669,11 @@ async def get_template_sequence():
 @app.post("/skip_template")
 async def skip_template():
     """Endpoint per saltare il template corrente e passare al successivo"""
-    global STATO_CONVERSAZIONE_JSON, EXIT_COUNTER
+    global STATO_CONVERSAZIONE_JSON, EXIT_COUNTER, LINGUA
     
     logger.info("\n=== INIZIO RICHIESTA SKIP_TEMPLATE ===")
     logger.info(f"Template attivo prima del salto: {template_manager.active_template}")
+    logger.info(f"Lingua corrente: {LINGUA}")
     
     try:
         # Carica lo stato attuale
@@ -697,8 +737,10 @@ async def skip_template():
             try:
                 risposta = ollama_manager.get_response(
                     template_type=template_manager.active_template,
-                    template=empty_template
+                    template=empty_template,
+                    lingua=LINGUA
                 )
+                logger.info(f"Risposta per il nuovo template: {risposta}")
             except Exception as e:
                 logger.error(f"Errore nella generazione della risposta per il nuovo template: {str(e)}")
                 risposta = f"Benvenuto al template {next_template}. Come posso aiutarti?"
@@ -709,7 +751,8 @@ async def skip_template():
                 "stato_conversazione": stato_attuale,
                 "nuovo_template": True,
                 "next_template": next_template,
-                "exit": False
+                "exit": False,
+                "riepilogo": False
             }
             
             logger.info("=== FINE RICHIESTA SKIP_TEMPLATE ===")
@@ -733,10 +776,11 @@ async def skip_template():
 @app.get("/get_continue")
 async def get_continue():
     """Endpoint per riproporre la domanda del primo campo libero del template attivo"""
-    global STATO_CONVERSAZIONE_JSON
+    global STATO_CONVERSAZIONE_JSON, LINGUA
     
     logger.info("\n=== INIZIO RICHIESTA GET_CONTINUE ===")
     logger.info(f"Template attivo: {template_manager.active_template}")
+    logger.info(f"Lingua corrente: {LINGUA}")
     
     try:
         # Carica lo stato attuale
@@ -756,7 +800,8 @@ async def get_continue():
             logger.info("Richiesta risposta a Ollama...")
             risposta = ollama_manager.get_response(
                 template_type=template_manager.active_template,
-                template=template_attivo
+                template=template_attivo,
+                lingua=LINGUA
             )
             logger.info(f"Risposta ottenuta da Ollama: {risposta}")
         except Exception as ollama_error:

@@ -1,15 +1,20 @@
 """
-Libreria per l'estrazione delle informazioni dal testo utilizzando il modello NuExtract-2-2B-experimental
+Libreria per l'estrazione delle informazioni dal testo utilizzando il modello NuExtract-2.0-2B
 """
 
 import json
+import sys
+import os
 from typing import Dict, Any, Optional, Tuple
-from .utils import extract_entities
+
+# Aggiungi la directory corrente al path per permettere l'import
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from utils import extract_entities
 
 class NuExtract:
-    def __init__(self, model_path: str = './NuExtract-2-2B-experimental'):
-        self.model_path = model_path
-        
+    def __init__(self):
+        pass
 
     def process_extraction(self, text: str, empty_template: Dict[str, Any], saved_template: Dict[str, Any]) -> Tuple[Dict[str, Any]]:
         """
@@ -31,8 +36,7 @@ class NuExtract:
             # Usa la funzione extract_entities da utils.py per ottenere la risposta dal modello
             result = extract_entities(
                 text=text,
-                template=json.dumps(empty_template, ensure_ascii=False),
-                model_path=self.model_path
+                template=json.dumps(empty_template, ensure_ascii=False)
             )
             
             # Converti la risposta in JSON
@@ -96,8 +100,7 @@ class NuExtract:
             # Usa la funzione extract_entities da utils.py per ottenere la risposta dal modello
             result = extract_entities(
                 text=text,
-                template=json.dumps(empty_template, ensure_ascii=False),
-                model_path=self.model_path
+                template=json.dumps(empty_template, ensure_ascii=False)
             )
             
             # Converti la risposta in JSON

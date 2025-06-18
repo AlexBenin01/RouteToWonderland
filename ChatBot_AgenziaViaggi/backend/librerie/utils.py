@@ -1,303 +1,168 @@
 import torch
-import torchvision.transforms as T
-from PIL import Image
-from torchvision.transforms.functional import InterpolationMode
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import os
+from transformers import AutoProcessor, AutoModelForVision2Seq
+from qwen_vl_utils import process_vision_info, fetch_image
 
-IMAGENET_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_STD = (0.229, 0.224, 0.225)
+# Percorso del modello locale
+model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'NuExtract-2.0-2B')
 
-def build_transform(input_size):
-    MEAN, STD = IMAGENET_MEAN, IMAGENET_STD
-    transform = T.Compose([
-        T.Lambda(lambda img: img.convert('RGB') if img.mode != 'RGB' else img),
-        T.Resize((input_size, input_size), interpolation=InterpolationMode.BICUBIC),
-        T.ToTensor(),
-        T.Normalize(mean=MEAN, std=STD)
-    ])
-    return transform
+# Carica il modello locale invece di scaricarlo da Hugging Face
+processor = AutoProcessor.from_pretrained(model_path, 
+                                          trust_remote_code=True, 
+                                          padding_side='left',
+                                          use_fast=True)
+model = AutoModelForVision2Seq.from_pretrained(model_path, 
+                                               trust_remote_code=True, 
+                                               torch_dtype=torch.bfloat16,
+                                               device_map="auto")
 
-def find_closest_aspect_ratio(aspect_ratio, target_ratios, width, height, image_size):
-    best_ratio_diff = float('inf')
-    best_ratio = (1, 1)
-    area = width * height
-    for ratio in target_ratios:
-        target_aspect_ratio = ratio[0] / ratio[1]
-        ratio_diff = abs(aspect_ratio - target_aspect_ratio)
-        if ratio_diff < best_ratio_diff:
-            best_ratio_diff = ratio_diff
-            best_ratio = ratio
-        elif ratio_diff == best_ratio_diff:
-            if area > 0.5 * image_size * image_size * ratio[0] * ratio[1]:
-                best_ratio = ratio
-    return best_ratio
 
-def dynamic_preprocess(image, min_num=1, max_num=12, image_size=448, use_thumbnail=False):
-    orig_width, orig_height = image.size
-    aspect_ratio = orig_width / orig_height
 
-    # calculate the existing image aspect ratio
-    target_ratios = set(
-        (i, j) for n in range(min_num, max_num + 1) for i in range(1, n + 1) for j in range(1, n + 1) if
-        i * j <= max_num and i * j >= min_num)
-    target_ratios = sorted(target_ratios, key=lambda x: x[0] * x[1])
-
-    # find the closest aspect ratio to the target
-    target_aspect_ratio = find_closest_aspect_ratio(
-        aspect_ratio, target_ratios, orig_width, orig_height, image_size)
-
-    # calculate the target width and height
-    target_width = image_size * target_aspect_ratio[0]
-    target_height = image_size * target_aspect_ratio[1]
-    blocks = target_aspect_ratio[0] * target_aspect_ratio[1]
-
-    # resize the image
-    resized_img = image.resize((target_width, target_height))
-    processed_images = []
-    for i in range(blocks):
-        box = (
-            (i % (target_width // image_size)) * image_size,
-            (i // (target_width // image_size)) * image_size,
-            ((i % (target_width // image_size)) + 1) * image_size,
-            ((i // (target_width // image_size)) + 1) * image_size
-        )
-        # split the image
-        split_img = resized_img.crop(box)
-        processed_images.append(split_img)
-    assert len(processed_images) == blocks
-    if use_thumbnail and len(processed_images) != 1:
-        thumbnail_img = image.resize((image_size, image_size))
-        processed_images.append(thumbnail_img)
-    return processed_images
-
-def load_image(image_file, input_size=448, max_num=12):
-    image = Image.open(image_file).convert('RGB')
-    transform = build_transform(input_size=input_size)
-    images = dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
-    pixel_values = [transform(image) for image in images]
-    pixel_values = torch.stack(pixel_values)
-    return pixel_values
-
-def prepare_inputs(messages, image_paths, tokenizer, device='cuda', dtype=torch.bfloat16):
-    """
-    Prepares multi-modal input components (supports multiple images per prompt).
-    
-    Args:
-        messages: List of input messages/prompts (strings or dicts with 'role' and 'content')
-        image_paths: List where each element is either None (for text-only) or a list of image paths
-        tokenizer: The tokenizer to use for applying chat templates
-        device: Device to place tensors on ('cuda', 'cpu', etc.)
-        dtype: Data type for image tensors (default: torch.bfloat16)
-    
-    Returns:
-        dict: Contains 'prompts', 'pixel_values_list', and 'num_patches_list' ready for the model
-    """
-    # Make sure image_paths list is at least as long as messages
-    if len(image_paths) < len(messages):
-        # Pad with None for text-only messages
-        image_paths = image_paths + [None] * (len(messages) - len(image_paths))
-    
-    # Process images and collect patch information
-    loaded_images = []
-    num_patches_list = []
-    for paths in image_paths:
-        if paths and isinstance(paths, list) and len(paths) > 0:
-            # Load each image in this prompt
-            prompt_images = []
-            prompt_patches = []
-            
-            for path in paths:
-                # Load the image
-                img = load_image(path).to(dtype=dtype, device=device)
-                
-                # Ensure img has correct shape [patches, C, H, W]
-                if len(img.shape) == 3:  # [C, H, W] -> [1, C, H, W]
-                    img = img.unsqueeze(0)
-                    
-                prompt_images.append(img)
-                # Record the number of patches for this image
-                prompt_patches.append(img.shape[0])
-            
-            loaded_images.append(prompt_images)
-            num_patches_list.append(prompt_patches)
-        else:
-            # Text-only prompt
-            loaded_images.append(None)
-            num_patches_list.append([])
-    
-    # Create the concatenated pixel_values_list
-    pixel_values_list = []
-    for prompt_images in loaded_images:
-        if prompt_images:
-            # Concatenate all images for this prompt
-            pixel_values_list.append(torch.cat(prompt_images, dim=0))
-        else:
-            # Text-only prompt
-            pixel_values_list.append(None)
-    
-    # Format messages for the model
-    if all(isinstance(m, str) for m in messages):
-        # Simple string messages: convert to chat format
-        batch_messages = [
-            [{"role": "user", "content": message}] 
-            for message in messages
-        ]
-    else:
-        # Assume messages are already in the right format
-        batch_messages = messages
-    
-    # Apply chat template
-    prompts = tokenizer.apply_chat_template(
-        batch_messages,
-        tokenize=False,
-        add_generation_prompt=True
-    )
-    
-    return {
-        'prompts': prompts,
-        'pixel_values_list': pixel_values_list,
-        'num_patches_list': num_patches_list
-    }
-
-def construct_message(text, template, examples=None):
+def construct_messages(document, template, examples=None, image_placeholder="<|vision_start|><|image_pad|><|vision_end|>"):
     """
     Construct the individual NuExtract message texts, prior to chat template formatting.
     """
+    images = []
     # add few-shot examples if needed
     if examples is not None and len(examples) > 0:
         icl = "# Examples:\n"
         for row in examples:
-            icl += f"## Input:\n{row['input']}\n## Output:\n{row['output']}\n"
+            example_input = row['input']
+            
+            if not isinstance(row['input'], str):
+                example_input = image_placeholder
+                images.append(row['input'])
+                
+            icl += f"## Input:\n{example_input}\n## Output:\n{row['output']}\n"
     else:
         icl = ""
         
-    return f"""# Template:\n{template}\n{icl}# Context:\n{text}"""
+    # if input document is an image, set text to an image placeholder
+    text = document
+    if not isinstance(document, str):
+        text = image_placeholder
+        images.append(document)
+    text = f"""# Template:\n{template}\n{icl}# Context:\n{text}"""
+    
+    messages = [
+        {
+            "role": "system",
+            "content": "You are NuExtract, an information extraction tool created by NuMind." 
+        },
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": text}] + images,
+        }
+    ]
+    return messages
 
-IMG_START_TOKEN='<img>'
-IMG_END_TOKEN='</img>'
-IMG_CONTEXT_TOKEN='<IMG_CONTEXT>'
 
-def nuextract_generate(model, tokenizer, prompts, generation_config, pixel_values_list=None, num_patches_list=None):
+def process_all_vision_info(messages, examples=None):
     """
-    Generate responses for a batch of NuExtract inputs.
-    Support for multiple and varying numbers of images per prompt.
+    Process vision information from both messages and in-context examples, supporting batch processing.
     
     Args:
-        model: The vision-language model
-        tokenizer: The tokenizer for the model
-        pixel_values_list: List of tensor batches, one per prompt
-                          Each batch has shape [num_images, channels, height, width] or None for text-only prompts
-        prompts: List of text prompts
-        generation_config: Configuration for text generation
-        num_patches_list: List of lists, each containing patch counts for images in a prompt
-        
+        messages: List of message dictionaries (single input) OR list of message lists (batch input)
+        examples: Optional list of example dictionaries (single input) OR list of example lists (batch)
+    
     Returns:
-        List of generated responses
+        A flat list of all images in the correct order:
+        - For single input: example images followed by message images
+        - For batch input: interleaved as (item1 examples, item1 input, item2 examples, item2 input, etc.)
+        - Returns None if no images were found
     """
-    img_context_token_id = tokenizer.convert_tokens_to_ids(IMG_CONTEXT_TOKEN)
-    model.img_context_token_id = img_context_token_id
     
-    # Replace all image placeholders with appropriate tokens
-    modified_prompts = []
-    total_image_files = 0
-    total_patches = 0
-    image_containing_prompts = []
-    for idx, prompt in enumerate(prompts):
-        # check if this prompt has images
-        has_images = (pixel_values_list and
-                      idx < len(pixel_values_list) and 
-                      pixel_values_list[idx] is not None and 
-                      isinstance(pixel_values_list[idx], torch.Tensor) and
-                      pixel_values_list[idx].shape[0] > 0)
+    
+    # Helper function to extract images from examples
+    def extract_example_images(example_item):
+        if not example_item:
+            return []
+            
+        # Handle both list of examples and single example
+        examples_to_process = example_item if isinstance(example_item, list) else [example_item]
+        images = []
         
-        if has_images:
-            # prompt with image placeholders
-            image_containing_prompts.append(idx)
-            modified_prompt = prompt
-            
-            patches = num_patches_list[idx] if (num_patches_list and idx < len(num_patches_list)) else []
-            num_images = len(patches)
-            total_image_files += num_images
-            total_patches += sum(patches)
-            
-            # replace each <image> placeholder with image tokens
-            for i, num_patches in enumerate(patches):
-                image_tokens = IMG_START_TOKEN + IMG_CONTEXT_TOKEN * model.num_image_token * num_patches + IMG_END_TOKEN
-                modified_prompt = modified_prompt.replace('<image>', image_tokens, 1)
+        for example in examples_to_process:
+            if isinstance(example.get('input'), dict) and example['input'].get('type') == 'image':
+                images.append(fetch_image(example['input']))
+                
+        return images
+    
+    # Normalize inputs to always be batched format
+    is_batch = messages and isinstance(messages[0], list)
+    messages_batch = messages if is_batch else [messages]
+    is_batch_examples = examples and isinstance(examples, list) and (isinstance(examples[0], list) or examples[0] is None)
+    examples_batch = examples if is_batch_examples else ([examples] if examples is not None else None)
+    
+    # Ensure examples batch matches messages batch if provided
+    if examples and len(examples_batch) != len(messages_batch):
+        if not is_batch and len(examples_batch) == 1:
+            # Single example set for a single input is fine
+            pass
         else:
-            # text-only prompt
-            modified_prompt = prompt
+            raise ValueError("Examples batch length must match messages batch length")
+    
+    # Process all inputs, maintaining correct order
+    all_images = []
+    for i, message_group in enumerate(messages_batch):
+        # Get example images for this input
+        if examples and i < len(examples_batch):
+            input_example_images = extract_example_images(examples_batch[i])
+            all_images.extend(input_example_images)
         
-        modified_prompts.append(modified_prompt)
+        # Get message images for this input
+        input_message_images = process_vision_info(message_group)[0] or []
+        all_images.extend(input_message_images)
     
-    # process all prompts in a single batch
-    tokenizer.padding_side = 'left'
-    model_inputs = tokenizer(modified_prompts, return_tensors='pt', padding=True)
-    input_ids = model_inputs['input_ids'].to(model.device)
-    attention_mask = model_inputs['attention_mask'].to(model.device)
-    
-    eos_token_id = tokenizer.convert_tokens_to_ids("<|im_end|>\n".strip())
-    generation_config['eos_token_id'] = eos_token_id
-    
-    # prepare pixel values
-    flattened_pixel_values = None
-    if image_containing_prompts:
-        # collect and concatenate all image tensors
-        all_pixel_values = []
-        for idx in image_containing_prompts:
-            all_pixel_values.append(pixel_values_list[idx])
-        
-        flattened_pixel_values = torch.cat(all_pixel_values, dim=0)
-        print(f"Processing batch with {len(prompts)} prompts, {total_image_files} actual images, and {total_patches} total patches")
-    else:
-        print(f"Processing text-only batch with {len(prompts)} prompts")
-    
-    # generate outputs
-    outputs = model.generate(
-        pixel_values=flattened_pixel_values,  # will be None for text-only prompts
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        **generation_config
-    )
-    
-    # Decode responses
-    responses = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-    
-    return responses
+    return all_images if all_images else None
+
 
 # =====================
 # UTILITY GENERALI
 # =====================
-def extract_entities(text, template, model_path='./NuExtract-2-2B-experimental'):
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
-    msg = construct_message(text, template)
-    input_messages = [msg]
-    input_content = prepare_inputs(
-        messages=input_messages,
-        image_paths=[],
-        tokenizer=tokenizer,
+def extract_entities(text, template):
+        # prepare the user message content
+    messages = [{"role": "user", "content": text}]
+    text = processor.tokenizer.apply_chat_template(
+        messages,
+        template=template, # template is specified here
+        tokenize=False,
+        add_generation_prompt=True,
     )
-    generation_config = {"do_sample": False, "num_beams": 1, "max_new_tokens": 2048}
-    with torch.no_grad():
-        result = nuextract_generate(
-            model=model,
-            tokenizer=tokenizer,
-            prompts=input_content['prompts'],
-            pixel_values_list=input_content['pixel_values_list'],
-            num_patches_list=input_content['num_patches_list'],
-            generation_config=generation_config
-        )
-    return result[0]
 
-def extract_and_print(text, template, model_path='./NuExtract-2-2B-experimental'):
-    """
-    Estrae e stampa le entità dal testo.
+    print(text)
+
+    image_inputs = process_all_vision_info(messages)
+    inputs = processor(
+        text=[text],
+        images=image_inputs,
+        padding=True,
+        return_tensors="pt",
+    ).to("cpu")
+
+    # we choose greedy sampling here, which works well for most information extraction tasks
+    generation_config = {"do_sample": False, "num_beams": 1, "max_new_tokens": 2048}
+
+    # Inference: Generation of the output
+    generated_ids = model.generate(
+        **inputs,
+        **generation_config
+    )
+    generated_ids_trimmed = [
+        out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+    ]
+    output_text = processor.batch_decode(
+        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    )
+
+    print(output_text)
     
-    Args:
-        text: Il testo da analizzare
-        template: Il template JSON che definisce lo schema di output
-        model_path: Il percorso al modello NuExtract
-    """
-    result = extract_entities(text, template, model_path)
-    return result
+    # Gestisci il caso in cui output_text è una lista
+    if isinstance(output_text, list) and len(output_text) > 0:
+        return output_text[0]  # Restituisci il primo elemento della lista
+    elif isinstance(output_text, list):
+        return ""  # Restituisci stringa vuota se la lista è vuota
+    else:
+        return output_text
+
+
