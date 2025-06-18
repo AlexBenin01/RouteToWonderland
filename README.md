@@ -94,7 +94,6 @@ Progettata sia per agenzie di viaggio che per viaggiatori individuali, RouteToWo
 ### Prerequisiti
 
 - Python 3.10
-- Node.js 16+
 - JDK 17 (per Droll_Service)
 - Maven (per Droll_Service)
 
