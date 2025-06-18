@@ -197,7 +197,7 @@ Ora puoi accedere all'applicazione su [http://localhost:5173](http://localhost:5
 
 ## Note importanti
 
-- Le cartelle `NuExtract-2-xB-experimental` e `nomic-embed-text-v1.5` sono escluse dal repository (`.gitignore`) perché contiene file di grandi dimensioni e modelli proprietari.
+- Le cartelle `NuExtract-2.0-xB` e `nomic-embed-text-v1.5` sono escluse dal repository (`.gitignore`) perché contiene file di grandi dimensioni e modelli proprietari.
 - Per il corretto funzionamento, assicurati di avere i file del modello nella posizione corretta.
 
 ---
