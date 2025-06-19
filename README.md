@@ -62,7 +62,8 @@ Progettata sia per agenzie di viaggio che per viaggiatori individuali, RouteToWo
 
 ## Tecnologie utilizzate
 
-- **Frontend**:  
+- **Frontend**:
+  - Node.js 
   - React  
   - Vite  
   - ESLint  
@@ -92,7 +93,7 @@ Progettata sia per agenzie di viaggio che per viaggiatori individuali, RouteToWo
 ## Requisiti e installazione
 
 ### Prerequisiti
-
+- Node.js
 - Python 3.10
 - JDK 17 (per Droll_Service)
 - Maven (per Droll_Service)
