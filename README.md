@@ -69,7 +69,8 @@ Progettata sia per agenzie di viaggio che per viaggiatori individuali, RouteToWo
   - ESLint  
 - **Backend**:  
   - Python  
-  - FastAPI  
+  - FastAPI
+  - Unicorn  
   - Pydantic  
   - Modello AI custom (locale, non incluso nel repository)
   - Ollama con modello Qwen3 ("qwen3:1.7b") per la generazione di risposte in linguaggio naturale
